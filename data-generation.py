@@ -26,7 +26,7 @@ def load_and_save_model():
         local_dir ="OmniParser/weights",
         allow_patterns = download_patterns,
     )
-    if not os.path.isfile("OmniParser/weights/icon_detect/model.safetensors"):
+    if not os.path.isfile("OmniParser/weights/icon_detect/best.pt"):
         tensor_dict = load_file("OmniParser/weights/icon_detect/model.safetensors")
         model = DetectionModel('OmniParser/weights/icon_detect/model.yaml')
         model.load_state_dict(tensor_dict)
@@ -100,6 +100,7 @@ class ImageProcessor:
         self.caption_model_processor = caption_model_processor
 
     def process_image(self, image: Image) -> Tuple[Image.Image, List[str]]:
+        image = Image.open(image).convert("RGB")
         ocr_bbox_rslt, _ = self._perform_ocr(image)
         text, ocr_bbox = ocr_bbox_rslt[0], ocr_bbox_rslt[1]
         
@@ -115,13 +116,20 @@ class ImageProcessor:
         )
 
     def _get_labeled_image(self, image: Image, ocr_bbox: Any, text: str) -> Tuple[Image.Image, List[str]]:
+        box_overlay_ratio = image.size[0] / 3200
+        draw_bbox_config = {
+            'text_scale': 0.8 * box_overlay_ratio,
+            'text_thickness': max(int(2 * box_overlay_ratio), 1),
+            'text_padding': max(int(3 * box_overlay_ratio), 1),
+            'thickness': max(int(3 * box_overlay_ratio), 1),
+        }
         labeled_img, coords, content_list = get_som_labeled_img(
             image,
             self.som_model,
             BOX_THRESHOLD=0.03,
             output_coord_in_ratio=False,
             ocr_bbox=ocr_bbox,
-            draw_bbox_config={'text_scale': 0.8},
+            draw_bbox_config=draw_bbox_config,
             caption_model_processor=self.caption_model_processor,
             ocr_text=text,
             use_local_semantics=True,
