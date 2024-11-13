@@ -1,0 +1,45 @@
+
+{
+    "level_1_conversation": [
+        {
+            "user_prompt": "Do I have any notifications?",
+            "vlm_response": "Yes, you have a notification showing a post from 'Binh Dan Hoc AI' where Luu Trung Vu posted 7 minutes ago."
+        },
+        {
+            "user_prompt": "Who’s online right now that I could chat with?",
+            "vlm_response": "Your friends Quan Nguyen, Cao Nguyen Nguyen, and Nguyen Ly Gia Binh are currently online, ready to chat."
+        },
+        {
+            "user_prompt": "Can you summarize what's new in my feed today?",
+            "vlm_response": "Sure! In your feed, you have a recent post from 'Binh Dan Hoc AI' by Luu Trung Vu asking about AI prompts. There's also a reminder that it's Quang Bao's birthday today, and some new story updates from Nguyen Tan Thanh, Ngo Gia Phuc, and Pham Duc Binh."
+        }
+    ],
+    "level_2_description": [
+        {
+            "user_prompt": "What options do I have on the left sidebar?",
+            "vlm_response": "On the left sidebar, you have options like Friends, Groups, Marketplace, Memories, Saved, and Videos."
+        },
+        {
+            "user_prompt": "What stories can I view at the top?",
+            "vlm_response": "You have stories available from friends like Nguyen Tan Thanh, Ngo Gia Phuc, Pham Duc Binh, and Nguyen Duong."
+        },
+        {
+            "user_prompt": "Can you give me an overview of the sidebar and the ads on the right?",
+            "vlm_response": "Certainly! On the left sidebar, you’ll find options such as Friends, Groups, Marketplace, Memories, Saved, and Videos. On the right, there are ads for real estate from Batdongsan.com.vn and a recruitment ad for an internship program, along with a birthday reminder for Quang Bao."
+        }
+    ],
+    "level_3_complex_tasks": [
+        {
+            "user_prompt": "Use the search bar to look up 'Elon Musk'.",
+            "vlm_response": "Step 1: Click on the search bar located at Text Box ID 0. Step 2: Type 'Elon Musk' into the search bar and press enter."
+        },
+        {
+            "user_prompt": "Open the profile of my friend Quan Nguyen and start a chat.",
+            "vlm_response": "Step 1: Locate Quan Nguyen in the 'Friends' section on the right sidebar. Step 2: Click on his profile (Text Box ID 40) to open it. Step 3: Once on his profile, click the messaging icon to start a chat."
+        },
+        {
+            "user_prompt": "Like the latest post from 'Binh Dan Hoc AI' and leave a comment saying, 'This is interesting!'",
+            "vlm_response": "Step 1: Scroll down to find the most recent post from 'Binh Dan Hoc AI' by Luu Trung Vu (Text Box ID 29). Step 2: Click on the 'like' icon under the post. Step 3: Click on the comment field and type 'This is interesting!' then press enter to post the comment."
+        }
+    ]
+}

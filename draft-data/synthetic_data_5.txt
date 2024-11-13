@@ -1,0 +1,45 @@
+
+{
+    "level_1_conversation": [
+        {
+            "user_prompt": "Are there any recent announcements?",
+            "vlm_response": "Yes, there are several recent announcements in the 'Thông báo' section, including reminders for submitting English certificates and participation in international exchange programs."
+        },
+        {
+            "user_prompt": "Who posted the announcement about student exchange programs?",
+            "vlm_response": "The announcement regarding participation in exchange programs was posted by Cù Đức Tài."
+        },
+        {
+            "user_prompt": "How many notifications do I have in total?",
+            "vlm_response": "You currently have 24 notifications in the 'Thông báo' section."
+        }
+    ],
+    "level_2_description": [
+        {
+            "user_prompt": "What sections are available on the left sidebar?",
+            "vlm_response": "The left sidebar includes sections such as Trang cá nhân, Thông tin cá nhân, Thông báo, Tra cứu thông tin, and several subsections like Chương trình đào tạo and Lịch học."
+        },
+        {
+            "user_prompt": "What are the main categories under 'Tra cứu thông tin'?",
+            "vlm_response": "Under 'Tra cứu thông tin', there are categories like Chương trình đào tạo, Lịch học, Lịch thi, Quyết định sinh viên, and Tài chính sinh viên."
+        },
+        {
+            "user_prompt": "Can you summarize the announcements displayed?",
+            "vlm_response": "The announcements cover topics such as English proficiency requirements, international student exchange programs, and reminders for submitting documents for graduation assessments."
+        }
+    ],
+    "level_3_complex_tasks": [
+        {
+            "user_prompt": "View the details of the latest announcement about English certificate submission.",
+            "vlm_response": "Step 1: Locate the latest announcement titled 'Thông báo nộp chứng chỉ tiếng Anh quốc tế xét tốt nghiệp' (Text Box ID 26). Step 2: Click on it to view the full details about certificate submission."
+        },
+        {
+            "user_prompt": "Check the announcements posted by 'Nguyễn Công Nam'.",
+            "vlm_response": "Step 1: Scroll to the 'Thông báo' section (Text Box ID 21). Step 2: Identify announcements by 'Nguyễn Công Nam' such as '[SHCD] Thông báo đợt học Sinh hoạt công dân năm 2024' and '[RLSV] Thông báo triển khai đánh giá kết quả rèn luyện sinh viên'."
+        },
+        {
+            "user_prompt": "Look up the details of the announcement for the 'Đại học Kinh tế Quốc dân' exchange program.",
+            "vlm_response": "Step 1: Find the announcement related to the exchange program with 'Đại học Kinh tế Quốc dân' (Text Box ID 48). Step 2: Click on it to view the full information about the program and application process."
+        }
+    ]
+}

@@ -1,0 +1,45 @@
+
+{
+    "level_1_conversation": [
+        {
+            "user_prompt": "Can you help me log in to my student account?",
+            "vlm_response": "To log in, enter your student ID in the 'Mã số sinh viên' field and your password in the 'Mật khẩu' field, then press 'ĐĂNG NHẬP'."
+        },
+        {
+            "user_prompt": "Where can I reset my password if I forgot it?",
+            "vlm_response": "If you've forgotten your password, click on 'Quên mật khẩu' under the password field to reset it."
+        },
+        {
+            "user_prompt": "How can I log in with my Google account?",
+            "vlm_response": "To log in with your Google account, click on the link that says 'Nhấn vào đây để đăng nhập bằng Google với Email ST UEH'."
+        }
+    ],
+    "level_2_description": [
+        {
+            "user_prompt": "What information do I need to log in here?",
+            "vlm_response": "You need to enter your student ID in the 'Mã số sinh viên' field and your password in the 'Mật khẩu' field to log in."
+        },
+        {
+            "user_prompt": "Can you describe the main login options on this page?",
+            "vlm_response": "The main login options include entering your student ID and password or using your Google account to log in."
+        },
+        {
+            "user_prompt": "What are the options provided for password recovery?",
+            "vlm_response": "For password recovery, there is an option labeled 'Quên mật khẩu' below the password field that allows you to reset your password if forgotten."
+        }
+    ],
+    "level_3_complex_tasks": [
+        {
+            "user_prompt": "Log in using my student ID and password.",
+            "vlm_response": "Step 1: Enter your student ID in the 'Mã số sinh viên' field (Text Box ID 15). Step 2: Enter your password in the 'Mật khẩu' field (Text Box ID 16). Step 3: Click on 'ĐĂNG NHẬP' (Text Box ID 20) to log in."
+        },
+        {
+            "user_prompt": "Reset my password using the 'Forgot password' option.",
+            "vlm_response": "Step 1: Click on 'Quên mật khẩu' located under the password field (Text Box ID 19). Step 2: Follow the instructions provided in the password recovery process."
+        },
+        {
+            "user_prompt": "Log in with my Google account.",
+            "vlm_response": "Step 1: Click on the link that says 'Nhấn vào đây để đăng nhập bằng Google với Email ST UEH' (Text Box ID 21). Step 2: Follow the Google authentication prompts to log in."
+        }
+    ]
+}

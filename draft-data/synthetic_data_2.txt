@@ -1,0 +1,45 @@
+
+{
+    "level_1_conversation": [
+        {
+            "user_prompt": "Do I have any unread notifications on any apps?",
+            "vlm_response": "Yes, you have 757 notifications on YouTube."
+        },
+        {
+            "user_prompt": "Which apps are pinned on my homepage?",
+            "vlm_response": "The apps on your homepage are Facebook, YouTube, NimoTV, X.com, Instagram, ChatGPT, Kaggle, Claude, and Papers With Code."
+        },
+        {
+            "user_prompt": "Can you give me a quick summary of the most important things on this screen?",
+            "vlm_response": "Certainly! You have a Google search bar in the center, some shortcuts like Facebook and YouTube on your homepage, and options like Gmail, Images, and notifications in the top right corner."
+        }
+    ],
+    "level_2_description": [
+        {
+            "user_prompt": "What options do I have on the top bar?",
+            "vlm_response": "On the top bar, you have options like Gmail, Images, and a grid icon to access other Google apps."
+        },
+        {
+            "user_prompt": "What are the apps displayed as shortcuts on this page?",
+            "vlm_response": "The shortcuts displayed include Facebook, YouTube, NimoTV, X.com, Instagram, ChatGPT, Kaggle, Claude, and Papers With Code."
+        },
+        {
+            "user_prompt": "Can you describe the main elements on this homepage?",
+            "vlm_response": "The main elements include the Google logo, a search bar where you can type a URL or search, several app shortcuts like Facebook and Instagram, and options like Gmail and Images on the top right."
+        }
+    ],
+    "level_3_complex_tasks": [
+        {
+            "user_prompt": "Search for 'latest AI research' using the search bar.",
+            "vlm_response": "Step 1: Click on the search bar located at Text Box ID 4. Step 2: Type 'latest AI research' and press enter to initiate the search."
+        },
+        {
+            "user_prompt": "Open YouTube to check the notifications.",
+            "vlm_response": "Step 1: Locate YouTube among the app shortcuts (Text Box ID 8). Step 2: Click on YouTube to open it and view your 757 notifications."
+        },
+        {
+            "user_prompt": "Add a new shortcut for 'Google Scholar'.",
+            "vlm_response": "Step 1: Click on 'Add shortcut' located at Text Box ID 16. Step 2: In the dialog box that appears, enter 'Google Scholar' and provide the URL. Step 3: Click 'Save' to add the shortcut."
+        }
+    ]
+}

@@ -1,0 +1,45 @@
+
+{
+    "level_1_conversation": [
+        {
+            "user_prompt": "Who is this creator?",
+            "vlm_response": "This is bisko.freedom, also known as Bisko. They have 188.9K followers and 2.2M likes."
+        },
+        {
+            "user_prompt": "What does this creator usually post about?",
+            "vlm_response": "Bisko.freedom usually posts about their adventures and unique lifestyle, often engaging with their audience about their travels and experiences."
+        },
+        {
+            "user_prompt": "How many followers and likes does this account have?",
+            "vlm_response": "The account has 188.9K followers and 2.2M likes."
+        }
+    ],
+    "level_2_description": [
+        {
+            "user_prompt": "What options are available for interacting with this creator?",
+            "vlm_response": "You have options to Follow, Message, and view their Playlists, Videos, Reposts, and Liked videos."
+        },
+        {
+            "user_prompt": "Can you describe what’s on the creator’s profile page?",
+            "vlm_response": "The profile page shows the creator’s name, bisko.freedom, their follower count, and options to Follow, Message, and view content like Videos, Reposts, and Liked videos. Their bio mentions adventures and includes a Patreon link."
+        },
+        {
+            "user_prompt": "What content categories are displayed on this page?",
+            "vlm_response": "Content categories include Playlists, Videos, and Reposts. You can see specific videos on topics like 'Live Livestream,' 'Uncle Is Healthy,' 'Patriotic English Class,' and more."
+        }
+    ],
+    "level_3_complex_tasks": [
+        {
+            "user_prompt": "Follow this creator and send them a message saying 'Love your content!'",
+            "vlm_response": "Step 1: Click on 'Follow' to start following the creator (Text Box ID 23). Step 2: Click on 'Message' (Text Box ID 24) and type 'Love your content!' then send the message."
+        },
+        {
+            "user_prompt": "Check the latest video and see how many likes it has.",
+            "vlm_response": "Step 1: Scroll down to the 'Videos' section (Text Box ID 32). Step 2: Find the latest video and check its like count displayed below the video thumbnail."
+        },
+        {
+            "user_prompt": "View the playlist titled 'Ben Tre' and check how many posts are in it.",
+            "vlm_response": "Step 1: Locate the playlist section titled 'Playlists' (Text Box ID 39). Step 2: Click on 'Ben Tre' (Text Box ID 41) and see that it contains 41 posts."
+        }
+    ]
+}

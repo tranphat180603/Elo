@@ -1,0 +1,23 @@
+
+# Preparation Instructions for Running the Synthetic Data Pipeline
+
+1. Clone the OmniParser repository:
+   ```bash
+   !git clone https://github.com/microsoft/OmniParser.git omni
+   ```
+
+2. Install the required dependencies:
+   ```bash
+   !pip install -r requirements.txt -qqq
+   ```
+   This command will install all necessary dependencies listed in the requirements file.
+
+3. Convert the model weights to PyTorch format:
+   ```bash
+   !python weights/convert_safetensor_to_pt.py
+   ```
+   This script will convert model weights from safetensor format to PyTorch format, ensuring compatibility.
+
+After completing these steps, you will be able to execute the main pipeline script.
+
+Note: Ensure that all paths and dependencies are correctly set up according to the instructions above before running the full pipeline.
