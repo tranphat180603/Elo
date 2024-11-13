@@ -184,6 +184,7 @@ class SyntheticDataGenerator:
             msgs=msgs,
             tokenizer=self.tokenizer
         )
+        print(response)
         user_prompt = response["question"]
         llm_response = response["response"]
         
