@@ -8,6 +8,7 @@ from PIL import Image
 import torch
 from transformers import AutoModel, AutoTokenizer
 from datasets import Dataset, load_dataset
+from huggingface_hub import hf_hub_download
 
 from OmniParser.utils import get_som_labeled_img, check_ocr_box, get_caption_model_processor, get_yolo_model
 
@@ -201,11 +202,12 @@ def main():
         cache_dir="/kaggle/working/omni/weights/icon_caption_blip2"
     )
 
-    icon_detect = AutoModel.from_pretrained(
-        "microsoft/OmniParser",
-        subfolder="icon_detect",
-        cache_dir="/kaggle/working/omni/weights/icon_detect"
-    )
+    icon_detect = hf_hub_download(
+    repo_id="microsoft/OmniParser",
+    filename="model.safetensors",
+    subfolder="icon_detect",
+    cache_dir="/kaggle/working/omni/weights/icon_detect"
+)
 
     florence = AutoModel.from_pretrained(
         "microsoft/OmniParser",
