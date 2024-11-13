@@ -4,15 +4,32 @@ import argparse
 import json
 from tqdm import tqdm
 from PIL import Image
+import shutil
+import os
 
 import torch
 from safetensors.torch import load_file
 from ultralytics.nn.tasks import DetectionModel
 from transformers import AutoModel, AutoTokenizer
 from datasets import Dataset, load_dataset
-from huggingface_hub import hf_hub_download
+from huggingface_hub import hf_hub_download, snapshot_download
 
-from OmniParser.utils import get_som_labeled_img, check_ocr_box, get_caption_model_processor, get_yolo_model
+# from OmniParser.utils import get_som_labeled_img, check_ocr_box, get_caption_model_processor, get_yolo_model
+
+def load_and_save_model():    
+    download_patterns = ["*.json", "*.bin", "*.safetensors", "*.yaml"]
+    #Load the subdirectories of Omni Parser into weights
+    snapshot_download(
+        repo_id="microsoft/OmniParser",
+        local_dir ="OmniParser/weights",
+        allow_patterns = download_patterns,
+    )
+    tensor_dict = load_file("weights/icon_detect/model.safetensors")
+
+    model = DetectionModel('weights/icon_detect/model.yaml')
+    model.load_state_dict(tensor_dict)
+    torch.save({'model':model}, 'weights/icon_detect/best.pt')
+    print("Converted safetensors to pt successfully!")
 
 @dataclass
 class PipelineConfig:
@@ -125,7 +142,7 @@ class SyntheticDataGenerator:
         return AutoModel.from_pretrained(
             self.config.vlm_model_name,
             trust_remote_code=True,
-            attn_implementation='flash_attention_2',
+            attn_implementation='sdpa',
             torch_dtype=torch.bfloat16
         ).eval().cuda()
 
@@ -197,30 +214,6 @@ class Dataset:
         return ds['train']
 
 def main():
-    #Load the subdirectories of Omni Parser into weights
-    blip2 = AutoModel.from_pretrained(
-        "microsoft/OmniParser",
-        subfolder="icon_caption_blip2",
-        cache_dir="/OmniParser/weights/icon_caption_blip2"
-    )
-
-    icon_detect = hf_hub_download(
-    repo_id="microsoft/OmniParser",
-    filename="model.safetensors",
-    subfolder="icon_detect",
-    cache_dir="/OmniParser/weights/icon_detect"
-    )
-    tensor_dict = load_file("/OmniParser/weights/icon_detect/model.safetensors")
-
-    model = DetectionModel('/OmniParser/weights/icon_detect/model.yaml')
-    model.load_state_dict(tensor_dict)
-    torch.save({'model':model}, 'weights/icon_detect/best.pt')
-
-    florence = AutoModel.from_pretrained(
-        "microsoft/OmniParser",
-        subfolder="icon_caption_florence",
-        cache_dir="/OmniParser/weights/icon_caption_florence"
-    ) 
     parser = argparse.ArgumentParser(description="Synthetic Data Generation Pipeline")
     parser.add_argument("--vlm_model_name", type=str, default="openbmb/MiniCPM-V-2_6")
     parser.add_argument("--yolo_model_path", type=str, default="OmniParser/weights/icon_detect/best.pt")
@@ -232,7 +225,9 @@ def main():
     
     args = parser.parse_args()
     config = PipelineConfig(**vars(args))
-    
+    #load models
+    load_and_save_model()
+
     # Load and slice dataset
     dataset_instance = Dataset()
     if config.end_index:
