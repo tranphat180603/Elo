@@ -12,9 +12,11 @@ from safetensors.torch import load_file
 from ultralytics.nn.tasks import DetectionModel
 from transformers import AutoModel, AutoTokenizer
 from datasets import Dataset, load_dataset
-from huggingface_hub import hf_hub_download, snapshot_download
+from huggingface_hub import hf_hub_download, snapshot_download, login
 
-# from OmniParser.utils import get_som_labeled_img, check_ocr_box, get_caption_model_processor, get_yolo_model
+from OmniParser.utils import get_som_labeled_img, check_ocr_box, get_caption_model_processor, get_yolo_model
+
+login("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")
 
 def load_and_save_model():    
     download_patterns = ["*.json", "*.bin", "*.safetensors", "*.yaml"]
@@ -24,12 +26,12 @@ def load_and_save_model():
         local_dir ="OmniParser/weights",
         allow_patterns = download_patterns,
     )
-    tensor_dict = load_file("weights/icon_detect/model.safetensors")
-
-    model = DetectionModel('weights/icon_detect/model.yaml')
-    model.load_state_dict(tensor_dict)
-    torch.save({'model':model}, 'weights/icon_detect/best.pt')
-    print("Converted safetensors to pt successfully!")
+    if not os.path.isfile("OmniParser/weights/icon_detect/model.safetensors"):
+        tensor_dict = load_file("OmniParser/weights/icon_detect/model.safetensors")
+        model = DetectionModel('OmniParser/weights/icon_detect/model.yaml')
+        model.load_state_dict(tensor_dict)
+        torch.save({'model':model}, 'OmniParser/weights/icon_detect/best.pt')
+        print("Converted safetensors to pt successfully!")
 
 @dataclass
 class PipelineConfig:
@@ -201,17 +203,17 @@ class SyntheticDataGenerator:
 
 class Dataset:
     def __init__(self):
-        self.ds = load_dataset("agentsea/wave-ui-25k")
-
-    def process_data(self):
-        filtered_ds = self.ds.filter(lambda example: example["platform"] == "web")
-        return filtered_ds
+        self.ds = load_dataset("agentsea/wave-ui-25k", cache_dir="")
 
     def select_data(self, start_index, end_index=None):
-        ds = self.process_data()
         if end_index:
-            return ds.select(range(start_index, end_index))
-        return ds['train']
+            return self.ds["train"].select(range(start_index, end_index))
+        return self.ds
+
+    def process_data(self, start_index, end_index=None):
+        ds = self.select_data(start_index, end_index)
+        filtered_ds = ds.filter(lambda example: example["platform"] == "web")
+        return filtered_ds
 
 def main():
     parser = argparse.ArgumentParser(description="Synthetic Data Generation Pipeline")
@@ -231,9 +233,9 @@ def main():
     # Load and slice dataset
     dataset_instance = Dataset()
     if config.end_index:
-        dataset = dataset_instance.select_data(config.start_index, config.end_index)
+        dataset = dataset_instance.process_data(config.start_index, config.end_index)
     else:
-        dataset = dataset_instance.select_data(config.start_index)
+        dataset = dataset_instance.process_data(config.start_index)
 
     generator = SyntheticDataGenerator(config)
     formatted_data = generator.generate_data(dataset)
@@ -244,5 +246,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
