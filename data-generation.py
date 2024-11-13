@@ -6,6 +6,8 @@ from tqdm import tqdm
 from PIL import Image
 
 import torch
+from safetensors.torch import load_file
+from ultralytics.nn.tasks import DetectionModel
 from transformers import AutoModel, AutoTokenizer
 from datasets import Dataset, load_dataset
 from huggingface_hub import hf_hub_download
@@ -199,20 +201,25 @@ def main():
     blip2 = AutoModel.from_pretrained(
         "microsoft/OmniParser",
         subfolder="icon_caption_blip2",
-        cache_dir="/kaggle/working/omni/weights/icon_caption_blip2"
+        cache_dir="/OmniParser/weights/icon_caption_blip2"
     )
 
     icon_detect = hf_hub_download(
     repo_id="microsoft/OmniParser",
     filename="model.safetensors",
     subfolder="icon_detect",
-    cache_dir="/kaggle/working/omni/weights/icon_detect"
-)
+    cache_dir="/OmniParser/weights/icon_detect"
+    )
+    tensor_dict = load_file("/OmniParser/weights/icon_detect/model.safetensors")
+
+    model = DetectionModel('/OmniParser/weights/icon_detect/model.yaml')
+    model.load_state_dict(tensor_dict)
+    torch.save({'model':model}, 'weights/icon_detect/best.pt')
 
     florence = AutoModel.from_pretrained(
         "microsoft/OmniParser",
         subfolder="icon_caption_florence",
-        cache_dir="/kaggle/working/omni/weights/icon_caption_florence"
+        cache_dir="/OmniParser/weights/icon_caption_florence"
     ) 
     parser = argparse.ArgumentParser(description="Synthetic Data Generation Pipeline")
     parser.add_argument("--vlm_model_name", type=str, default="openbmb/MiniCPM-V-2_6")
