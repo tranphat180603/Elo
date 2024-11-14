@@ -169,11 +169,14 @@ def get_parsed_content_icon_phi3v(filtered_boxes, ocr_bbox, image_source, captio
 
     return generated_texts
 
-def remove_overlap(boxes, iou_threshold, ocr_bbox=None):
+def remove_overlap(boxes, iou_threshold, image_size=None, max_width_ratio=0.4, max_absolute_width=None, ocr_bbox=None):
     assert ocr_bbox is None or isinstance(ocr_bbox, List)
 
     def box_area(box):
         return (box[2] - box[0]) * (box[3] - box[1])
+
+    def box_width(box):
+        return box[2] - box[0]  # x2 - x1
 
     def intersection_area(box1, box2):
         x1 = max(box1[0], box2[0])
@@ -196,35 +199,40 @@ def remove_overlap(boxes, iou_threshold, ocr_bbox=None):
     filtered_boxes = []
     if ocr_bbox:
         filtered_boxes.extend(ocr_bbox)
-    # print('ocr_bbox!!!', ocr_bbox)
-    for i, box1 in enumerate(boxes):
-        # if not any(IoU(box1, box2) > iou_threshold and box_area(box1) > box_area(box2) for j, box2 in enumerate(boxes) if i != j):
-        is_valid_box = True
-        for j, box2 in enumerate(boxes):
-            if i != j and IoU(box1, box2) > iou_threshold and box_area(box1) > box_area(box2):
-                is_valid_box = False
-                break
-        if is_valid_box:
-            # add the following 2 lines to include ocr bbox
-            if ocr_bbox:
-                if not any(IoU(box1, box3) > iou_threshold for k, box3 in enumerate(ocr_bbox)):
-                    filtered_boxes.append(box1)
-            else:
-                filtered_boxes.append(box1)
-    return torch.tensor(filtered_boxes)
 
-def load_image(image_path: str) -> Tuple[np.array, torch.Tensor]:
-    transform = T.Compose(
-        [
-            T.RandomResize([800], max_size=1333),
-            T.ToTensor(),
-            T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-        ]
-    )
-    image_source = Image.open(image_path).convert("RGB")
-    image = np.asarray(image_source)
-    image_transformed, _ = transform(image_source, None)
-    return image, image_transformed
+    # Calculate image width if image_size is provided
+    image_width = None
+    if image_size:
+        image_width = image_size[1]  # Width is the second element
+
+    for i, box1 in enumerate(boxes):
+        # First check if box width is too large
+        is_valid_size = True
+        width = box_width(box1)
+        
+        if image_width and max_width_ratio:
+            if width / image_width > max_width_ratio:
+                is_valid_size = False
+                
+        if max_absolute_width and width > max_absolute_width:
+            is_valid_size = False
+
+        # Only proceed with overlap check if box size is valid
+        if is_valid_size:
+            is_valid_box = True
+            for j, box2 in enumerate(boxes):
+                if i != j and IoU(box1, box2) > iou_threshold and box_area(box1) > box_area(box2):
+                    is_valid_box = False
+                    break
+            
+            if is_valid_box:
+                if ocr_bbox:
+                    if not any(IoU(box1, box3) > iou_threshold for k, box3 in enumerate(ocr_bbox)):
+                        filtered_boxes.append(box1)
+                else:
+                    filtered_boxes.append(box1)
+
+    return torch.tensor(filtered_boxes)
 
 
 def annotate(image_source: np.ndarray, boxes: torch.Tensor, logits: torch.Tensor, phrases: List[str], text_scale: float, 
@@ -250,7 +258,7 @@ def annotate(image_source: np.ndarray, boxes: torch.Tensor, logits: torch.Tensor
 
     labels = [f"{phrase}" for phrase in range(boxes.shape[0])]
 
-    from util.box_annotator import BoxAnnotator 
+    from OmniParser.util.box_annotator import BoxAnnotator
     box_annotator = BoxAnnotator(text_scale=text_scale, text_padding=text_padding,text_thickness=text_thickness,thickness=thickness) # 0.8 for mobile/web, 0.3 for desktop # 0.4 for mind2web
     annotated_frame = image_source.copy()
     annotated_frame = box_annotator.annotate(scene=annotated_frame, detections=detections, labels=labels, image_size=(w,h))
@@ -304,7 +312,7 @@ def get_som_labeled_img(img_path, model=None, BOX_TRESHOLD = 0.01, output_coord_
     TEXT_PROMPT = "clickable buttons on the screen"
     # BOX_TRESHOLD = 0.02 # 0.05/0.02 for web and 0.1 for mobile
     TEXT_TRESHOLD = 0.01 # 0.9 # 0.01
-    image_source = Image.open(img_path).convert("RGB")
+    image_source = img_path.convert("RGB")
     w, h = image_source.size
     # import pdb; pdb.set_trace()
     if False: # TODO
