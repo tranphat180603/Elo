@@ -59,7 +59,7 @@ def get_enhanced_meta_prompt(level: str, parsed_content_list: List[str]) -> str:
     enhanced_meta_prompts = {
         "conversation": (
             context_description +
-            "Imagine a user is exploring this website and has questions about its contents or functionality. You are an agent  Based on this information, create three user questions and responses in a conversational style.\n\n"
+            "Imagine a user is exploring this website and has questions about its contents or functionality. You are an agent  Based on this information, create two user questions and responses in a conversational style.\n\n"
             "Please respond ONLY in the following valid JSON format, without any additional commentary or formatting:\n"
             "[\n"
             "  {\n"
@@ -73,13 +73,12 @@ def get_enhanced_meta_prompt(level: str, parsed_content_list: List[str]) -> str:
             "]\n\n"
             "Ensure that there is no text outside of the JSON structure, as this will be parsed directly. Follow these instructions strictly to avoid parsing errors."
             "\n\n"
-            "- For the first question, make it brief and focused on a single element, such as asking about recent updates, a specific section, or basic site functionality. For example, 'What's new on the homepage?' or 'How do I check my notifications?'\n"
-            "- For the second question, add complexity by referencing multiple elements or comparing sections. For instance, 'What's the difference between the main articles and trending topics sections?'\n"
-            "- For the third question, make it the most detailed, covering questions about how different site sections interact or summarizing multiple updates. For example, 'Can you summarize today's updates from the news, notifications, and recommendations?' Avoid mentioning specific technical terms like 'box IDs' or 'coordinates.'"
+            "- For the first question, make it brief and focused on some elements, such as asking about recent updates, a specific section, or basic site functionality. For example, 'What's new on the homepage?' or 'How do I check my notifications?'\n"
+            "- For the second question, make it the most detailed, covering questions about how different site sections interact or summarizing multiple updates. For example, 'Can you summarize today's updates from the news, notifications, and recommendations?' Avoid mentioning specific technical terms like 'box IDs' or 'coordinates.'"
         ),
         "description": (
             context_description +
-            "Imagine a user is trying to get an overview of the website's layout and its main sections. Create three user questions and responses that provide increasingly detailed descriptions.\n\n"
+            "Imagine a user is trying to get an overview of the website's layout and its main sections. Create two user questions and responses that provide increasingly detailed descriptions.\n\n"
             "Respond ONLY in the following valid JSON array format, without additional commentary:\n"
             "[\n"
             "  {\n"
@@ -91,8 +90,7 @@ def get_enhanced_meta_prompt(level: str, parsed_content_list: List[str]) -> str:
             '    "response": "Another assistant response"\n'
             "  }\n"
             "]\n\n"
-            "- The first response should describe a single key section or feature on the website.\n"
-            "- The second response should cover multiple sections or a broader area of the site.'\n"
+            "- The first response should cover multiple sections or a broader area of the site. For example: Tell me the name of some of my online friends on the right side of the page.'\n"
             "- The third response should offer a comprehensive overview of the visible sections, such as 'What are the main parts of this page, including the sidebar, main content area, and footer?' or 'Can you summarize the features available across the dashboard?' Avoid mentioning specific technical terms like 'box IDs' or 'coordinates.'"
         ),
         "complex_tasks": (
