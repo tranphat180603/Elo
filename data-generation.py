@@ -59,7 +59,8 @@ def get_enhanced_meta_prompt(level: str, parsed_content_list: List[str]) -> str:
     enhanced_meta_prompts = {
         "conversation": (
             context_description +
-            "Imagine a user is exploring this website and has questions about its contents or functionality. You are an agent  Based on this information, create two user questions and responses in a conversational style.\n\n"
+            "Imagine you are a helpful agent answering questions from a user who is exploring this website. Your role is to help the user understand the website's contents and functionalities in a conversational and supportive manner. Based on this information, create three user questions and provide appropriate responses in a conversational style.\n\n"
+            "Your job is to create 2 high-quality pairs of question response to simulate this situation. \n"
             "Please respond ONLY in the following valid JSON format, without any additional commentary or formatting:\n"
             "[\n"
             "  {\n"
@@ -78,7 +79,8 @@ def get_enhanced_meta_prompt(level: str, parsed_content_list: List[str]) -> str:
         ),
         "description": (
             context_description +
-            "Imagine a user is trying to get an overview of the website's layout and its main sections. Create two user questions and responses that provide increasingly detailed descriptions.\n\n"
+            "Imagine you are an agent helping a user get an overview of the website's layout and its main sections. The user is curious about how the website is organized, and your job is to provide increasingly detailed descriptions in response to their questions.\n\n"
+            "Your job is to create 2 high-quality pairs of question response to simulate this situation.\n"
             "Respond ONLY in the following valid JSON array format, without additional commentary:\n"
             "[\n"
             "  {\n"
@@ -91,7 +93,7 @@ def get_enhanced_meta_prompt(level: str, parsed_content_list: List[str]) -> str:
             "  }\n"
             "]\n\n"
             "- The first response should cover multiple sections or a broader area of the site. For example: Tell me the name of some of my online friends on the right side of the page.'\n"
-            "- The third response should offer a comprehensive overview of the visible sections, such as 'What are the main parts of this page, including the sidebar, main content area, and footer?' or 'Can you summarize the features available across the dashboard?' Avoid mentioning specific technical terms like 'box IDs' or 'coordinates.'"
+            "- The second response should offer a comprehensive overview of the visible sections, such as 'What are the main parts of this page, including the sidebar, main content area, and footer?' or 'Can you summarize the features available across the dashboard?' Avoid mentioning specific technical terms like 'box IDs' or 'coordinates.'"
         ),
         "complex_tasks": (
             context_description +
