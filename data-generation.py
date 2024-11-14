@@ -38,7 +38,7 @@ def load_and_save_model():
         torch.save({'model':model}, 'OmniParser/weights/icon_detect/best.pt')
         print("Converted safetensors to pt successfully!")
 def sanitize_filename(filename):
-    return filename.replace("/", "_").replace("\\", "_")
+    return filename.replace("/", "_").replace("\\", "_").replace(" ", "_")
 
 @dataclass
 class PipelineConfig:
@@ -52,14 +52,14 @@ class PipelineConfig:
 
 def get_enhanced_meta_prompt(level: str, parsed_content_list: List[str]) -> str:
     context_description = (
-        f"You are given an image with several labeled elements. Here is the context of the visible items on this screen:\n"
+        f"You are given an image with elements that have been bounded by boxes to increase precision. Here is the list of the bounding boxes on this screen and their corresponding elements:\n"
         f"{parsed_content_list}\n\n"
     )
     
     enhanced_meta_prompts = {
         "conversation": (
             context_description +
-            "Imagine a user is exploring this website and has questions about its contents or functionality. Based on this information, create three user questions and responses in a conversational style.\n\n"
+            "Imagine a user is exploring this website and has questions about its contents or functionality. You are an agent  Based on this information, create three user questions and responses in a conversational style.\n\n"
             "Please respond ONLY in the following valid JSON format, without any additional commentary or formatting:\n"
             "[\n"
             "  {\n"
@@ -97,30 +97,28 @@ def get_enhanced_meta_prompt(level: str, parsed_content_list: List[str]) -> str:
         ),
         "complex_tasks": (
             context_description +
-            "Imagine a user wants to perform specific actions on this website. Create three progressively complex user questions and responses with detailed, step-by-step instructions.\n\n"
-            "Please, only choose action that you can clearly see the bounding box attached to the elements involved in the action. Don't choose the action where bounding boxes are not specified."
-            "Please respond ONLY in the following valid JSON format, without any additional text:\n"
+            "Imagine you are guiding a user through interactions on a form-based webpage. The page you are helping with contains static elements such as text boxes, radio buttons, drop-down lists, and other similar input controls. Examples include hotel booking forms, travel site filters, registration forms, or product filters. The tasks do not involve any page transitions or loading of new elements—everything is visible from the start.\n\n"
+            "You must create three user questions that involve progressively complex tasks. These tasks should only use the elements that have bounding boxes attached to them, such as text boxes, buttons, radio buttons, or any input elements clearly indicated in the provided image. Focus solely on actions within this single page, and do not reference interactions that involve navigating away from the page or adding new content beyond what is visible.\n\n"
+            "Please respond ONLY in the following valid JSON format, without any additional text or commentary:\n"
             "[\n"
             "  {\n"
             '    "question": "User question here",\n'
-            '    "response": "Step 1: Do this (Box ID). Step 2: Then do this (Box ID)."\n'
+            '    "response": "Step 1: Do this (Text Box ID 0: Gmail). Step 2: Then do this (Text Box ID 1: Google)."\n'
             "  },\n"
             "  {\n"
-            '    "question": "Another question",\n'
-            '    "response": "Step 1: First step (Box ID). Step 2: Second step (Box ID)."\n'
+            '    "question": "Another user question",\n'
+            '    "response": "Step 1: First step (Text Box ID 2: Log in). Step 2: Second step (Text Box ID 3: Log out)."\n'
             "  }\n"
             "]\n\n"
             
-            "Guidelines for responses:\n"
-            "- First question: Simple task using 1-2 steps\n"
-            "- Second question: Medium task using 2-3 steps\n"
-            "- Third question: Complex task using 3-4 steps\n\n"
+            "Guidelines for generating responses:\n"
+            "- First question: Create a simple task that involves interacting with 1-2 elements, such as entering information into one or two text boxes or selecting a radio button.\n"
+            "- Second question: Create a task that involves 2-3 steps, such as filling in multiple text boxes or making a combination of text input and selection, like a drop-down list and a radio button.\n"
+            "- Third question: Create a complex task that involves interacting with 3-4 different elements on the form, such as filling out multiple text boxes, selecting multiple options, or adjusting settings via different input elements.\n\n"
             
             "Important:\n"
-            "- Include box IDs in parentheses after mentioning any element\n"
-            "- Use numbered steps in responses\n"
-            "- Keep the JSON structure exactly as shown above\n"
-            "- No text outside the JSON structure"
+            "- Ensure each action only involves elements with bounding boxes—do not include any interaction with elements that are not clearly indicated with bounding boxes.\n"
+            "- Include box IDs in parentheses after mentioning any element to clearly identify which part of the interface to interact with (e.g., 'Select Gmail ('Text Box ID 0: Gmail')').\n"
         )
     }
 
