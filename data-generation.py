@@ -315,54 +315,64 @@ def main():
     else:
         dataset = dataset_instance.process_data(config.start_index)
 
-    # output_dir = "processed_images"
-    # if not os.path.exists(output_dir):
-    #     os.makedirs(output_dir)
+    output_dir = "processed_images"
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
-    # som_model = get_yolo_model(model_path='OmniParser/weights/icon_detect/best.pt')
-    # caption_model_processor = get_caption_model_processor(model_name="blip2", model_name_or_path="OmniParser/weights/icon_caption_blip2")
-    # image_processor = ImageProcessor(som_model, caption_model_processor)
-    # # Process and save each image
-    # image_name = ""
-    # boxes_list = [] #boxes property
-    # for idx, sample in enumerate(tqdm(dataset, desc="Processing Images")):
-    #     try:
-    #         # Process image
-    #         processed_image, coordinates, bounding_boxes = image_processor.process_image(sample["image"])
+    som_model = get_yolo_model(model_path='OmniParser/weights/icon_detect/best.pt')
+    caption_model_processor = get_caption_model_processor(model_name="blip2", model_name_or_path="OmniParser/weights/icon_caption_blip2")
+    image_processor = ImageProcessor(som_model, caption_model_processor)
+    # Process and save each image
+    image_name = ""
+    boxes_list = []  # boxes property
+    save_interval = 100
 
-    #         # Sanitize the image name to avoid unintended directories
-    #         image_name = f"processed_image_{sanitize_filename(sample['name'])}.png"
+    for idx, sample in enumerate(tqdm(dataset, desc="Processing Images")):
+        try:
+            # Process image
+            processed_image, coordinates, bounding_boxes = image_processor.process_image(sample["image"])
 
-    #         # Create a JSON entry for the box properties
-    #         box_list = {
-    #             "image_name": image_name,
-    #             "boxes_content": bounding_boxes,
-    #             "coord": coordinates
-    #         }
-    #         boxes_list.append(box_list)
+            # Sanitize the image name to avoid unintended directories
+            image_name = f"processed_image_{sanitize_filename(sample['name'])}.png"
 
-    #         # Decode image and save as PNG
-    #         normal_image = Image.open(BytesIO(base64.b64decode(processed_image)))
-    #         normal_image_path = os.path.join(output_dir, image_name)
+            # Create a JSON entry for the box properties
+            box_list = {
+                "image_name": image_name,
+                "boxes_content": bounding_boxes,
+                "coord": coordinates
+            }
+            boxes_list.append(box_list)
 
-    #         # Attempt to save the image, skip if there's an issue
-    #         normal_image.save(normal_image_path)
+            # Decode image and save as PNG
+            normal_image = Image.open(BytesIO(base64.b64decode(processed_image)))
+            normal_image_path = os.path.join(output_dir, image_name)
 
-    #     except Exception as e:
-    #         # Log the error and continue to the next sample
-    #         print(f"Error processing sample {sample['name']}: {e}")
-    #         continue
-    # with open("box_properties.json", "w") as f:
-    #     json.dump(boxes_list, f, indent = 4)
+            # Attempt to save the image, skip if there's an issue
+            normal_image.save(normal_image_path)
 
-    # print(f"All processed images saved in '{output_dir}' directory.")
+            # Save incrementally every `save_interval` samples
+            if idx % save_interval == 0 and idx > 0:
+                with open("box_properties.json", "w") as f:
+                    json.dump(boxes_list, f, indent=4)
 
-    generator = SyntheticDataGenerator(config)
-    formatted_data = generator._generate_conversation_data(dataset)
+        except Exception as e:
+            # Log the error and continue to the next sample
+            print(f"Error processing sample {sample['name']}: {e}")
+            continue
+
+    # Final save after the loop
+    with open("box_properties.json", "w") as f:
+        json.dump(boxes_list, f, indent=4)
+
+
+    print(f"All processed images saved in '{output_dir}' directory.")
+
+    # generator = SyntheticDataGenerator(config)
+    # formatted_data = generator._generate_conversation_data(dataset)
     
-    with open(config.output_file, "w") as f:
-        json.dump(formatted_data, f, indent=4)
-    print(f"Data saved to {config.output_file}")
+    # with open(config.output_file, "w") as f:
+    #     json.dump(formatted_data, f, indent=4)
+    # print(f"Data saved to {config.output_file}")
 
 if __name__ == "__main__":
     main()
