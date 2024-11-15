@@ -333,7 +333,7 @@ def main():
             processed_image, coordinates, bounding_boxes = image_processor.process_image(sample["image"])
 
             # Sanitize the image name to avoid unintended directories
-            image_name = f"processed_image_{sanitize_filename(sample['name'])}.png"
+            image_name = f"processed_image_{idx}.png"
 
             # Create a JSON entry for the box properties
             box_list = {
@@ -343,6 +343,12 @@ def main():
             }
             boxes_list.append(box_list)
 
+            # Check if processed_image is a PIL image
+            if isinstance(processed_image, Image.Image):
+                # Save image
+                normal_image_path = os.path.join(output_dir, image_name)
+                processed_image.save(normal_image_path)
+            
             # Decode image and save as PNG
             normal_image = Image.open(BytesIO(base64.b64decode(processed_image)))
             normal_image_path = os.path.join(output_dir, image_name)
