@@ -333,7 +333,7 @@ def main():
             processed_image, coordinates, bounding_boxes = image_processor.process_image(sample["image"])
 
             # Sanitize the image name to avoid unintended directories
-            image_name = f"processed_image_{idx}.png"
+            image_name = f"processed_image_{sanitize_filename(sample['image'])}.png"
 
             # Create a JSON entry for the box properties
             box_list = {
