@@ -40,6 +40,17 @@ def load_and_save_model():
 def sanitize_filename(filename):
     return filename.replace("/", "_").replace("\\", "_").replace(" ", "_")
 
+def convert_ndarray_to_list(obj):
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, list):
+        return [convert_ndarray_to_list(item) for item in obj]
+    elif isinstance(obj, dict):
+        return {key: convert_ndarray_to_list(value) for key, value in obj.items()}
+    else:
+        return obj
+
+
 @dataclass
 class PipelineConfig:
     vlm_model_name: str = "openbmb/MiniCPM-V-2_6"
@@ -47,6 +58,7 @@ class PipelineConfig:
     caption_model_name: str = "blip2"
     caption_model_path: str = "OmniParser/weights/icon_caption_blip2"
     output_file: str = "data.json"
+    logging_file: str = "box_prop.json"
     start_index: int = 0
     end_index: int = None
 
@@ -279,18 +291,45 @@ class SyntheticDataGenerator:
 
 class Dataset:
     def __init__(self):
+        # Load dataset and apply default filter
         self.ds = load_dataset("agentsea/wave-ui-25k", cache_dir="")
+        self.filtered_ds = self._apply_default_filter()
+
+    def _apply_default_filter(self):
+        # Apply filter to keep only web platform examples in English
+        return self.ds["train"].filter(lambda example: example["platform"] == "web" and example["language"] == "English")
 
     def select_data(self, start_index, end_index=None):
         if end_index:
-            return self.ds["train"].select(range(start_index, end_index))
+            return self.filtered_ds.select(range(start_index, end_index))
         else:
-            return self.ds["train"].select(range(start_index, len(self.ds["train"])))
+            return self.filtered_ds.select(range(start_index, len(self.filtered_ds)))
+
+    def process_data_in_batches(self, start_index, end_index=None, batch_size=100):
+        total_size = len(self.filtered_ds)
+        end_index = end_index if end_index else total_size
+        for i in range(start_index, end_index, batch_size):
+            yield self.filtered_ds.select(range(i, min(i + batch_size, end_index)))
+
+class StreamingJSONWriter:
+    def __init__(self, filename):
+        self.filename = filename
+        self.is_first = True
         
-    def process_data(self, start_index, end_index=None):
-        ds = self.select_data(start_index, end_index)
-        filtered_ds = ds.filter(lambda example: example["platform"] == "web" and example["language"] == "English")
-        return filtered_ds
+        # Initialize the JSON file with an opening bracket
+        with open(self.filename, 'w') as f:
+            f.write('[\n')
+    
+    def write_entry(self, entry):
+        with open(self.filename, 'a') as f:
+            if not self.is_first:
+                f.write(',\n')
+            json.dump(entry, f)
+            self.is_first = False
+    
+    def close(self):
+        with open(self.filename, 'a') as f:
+            f.write('\n]')
 
 def main():
     parser = argparse.ArgumentParser(description="Synthetic Data Generation Pipeline")
@@ -299,21 +338,15 @@ def main():
     parser.add_argument("--caption_model_name", type=str, default="blip2")
     parser.add_argument("--caption_model_path", type=str, default="OmniParser/weights/icon_caption_blip2")
     parser.add_argument("--output_file", type=str, default="data.json")
+    parser.add_argument("--logging_file", type=str, default="box_prop1.json")
     parser.add_argument("--start_index", type=int, default=0, help="Starting index for dataset split")
     parser.add_argument("--end_index", type=int, help="Ending index for dataset split")
     
     args = parser.parse_args()
     config = PipelineConfig(**vars(args))
-    #load models
+    
+    # load models
     load_and_save_model()
-
-
-    # Load and slice dataset
-    dataset_instance = Dataset()
-    if config.end_index:
-        dataset = dataset_instance.process_data(config.start_index, config.end_index)
-    else:
-        dataset = dataset_instance.process_data(config.start_index)
 
     output_dir = "processed_images"
     if not os.path.exists(output_dir):
@@ -322,55 +355,60 @@ def main():
     som_model = get_yolo_model(model_path='OmniParser/weights/icon_detect/best.pt')
     caption_model_processor = get_caption_model_processor(model_name="blip2", model_name_or_path="OmniParser/weights/icon_caption_blip2")
     image_processor = ImageProcessor(som_model, caption_model_processor)
-    # Process and save each image
-    image_name = ""
-    boxes_list = []  # boxes property
-    save_interval = 100
+    
+    batch_size = 20  
+    box_prop_name = config.logging_file
+    print(f"Logging in file {box_prop_name}")
+    
+    dataset_instance = Dataset()
+    json_writer = None
+    
+    try:
+        json_writer = StreamingJSONWriter(config.logging_file)
+        
+        for batch in tqdm(dataset_instance.process_data_in_batches(config.start_index, config.end_index, batch_size), desc = "Full Dataset Progress"):
+            for idx, sample in enumerate(tqdm(batch, desc="Processing Batch Images")):
+                try:
+                    # Process image
+                    print(f"Processing image: {sample['name']}")
+                    with torch.no_grad():
+                        processed_image, coordinates, bounding_boxes = image_processor.process_image(sample["image"])
 
-    for idx, sample in enumerate(tqdm(dataset, desc="Processing Images")):
-        try:
-            # Process image
-            processed_image, coordinates, bounding_boxes = image_processor.process_image(sample["image"])
+                    # Sanitize the image name
+                    image_name = f"processed_image_{sanitize_filename(sample['name'])}.png"
 
-            # Sanitize the image name to avoid unintended directories
-            image_name = f"processed_image_{sanitize_filename(sample['image'])}.png"
+                    # Create and write JSON entry
+                    box_list = {
+                        "image_name": image_name,
+                        "boxes_content": convert_ndarray_to_list(bounding_boxes),
+                        "coord": convert_ndarray_to_list(coordinates)
+                    }
+                    json_writer.write_entry(box_list)
 
-            # Create a JSON entry for the box properties
-            box_list = {
-                "image_name": image_name,
-                "boxes_content": bounding_boxes,
-                "coord": coordinates
-            }
-            boxes_list.append(box_list)
+                    # Save image
+                    normal_image_path = os.path.join(output_dir, image_name)
+                    if isinstance(processed_image, Image.Image):
+                        processed_image.save(normal_image_path)
+                    else:
+                        normal_image = Image.open(BytesIO(base64.b64decode(processed_image)))
+                        normal_image.save(normal_image_path)
+                    print("Image saved")
 
-            # Check if processed_image is a PIL image
-            if isinstance(processed_image, Image.Image):
-                # Save image
-                normal_image_path = os.path.join(output_dir, image_name)
-                processed_image.save(normal_image_path)
-            
-            # Decode image and save as PNG
-            normal_image = Image.open(BytesIO(base64.b64decode(processed_image)))
-            normal_image_path = os.path.join(output_dir, image_name)
+                except Exception as e:
+                    print(f"Error processing sample {sample['name']}: {e}")
+                    continue
 
-            # Attempt to save the image, skip if there's an issue
-            normal_image.save(normal_image_path)
+            # Clear GPU cache after each batch
+            torch.cuda.empty_cache()
 
-            # Save incrementally every `save_interval` samples
-            if idx % save_interval == 0 and idx > 0:
-                with open("box_properties.json", "w") as f:
-                    json.dump(boxes_list, f, indent=4)
-
-        except Exception as e:
-            # Log the error and continue to the next sample
-            print(f"Error processing sample {sample['name']}: {e}")
-            continue
-
-    # Final save after the loop
-    with open("box_properties.json", "w") as f:
-        json.dump(boxes_list, f, indent=4)
-
-
+    except Exception as e:
+        print(f"An error occurred during processing: {e}")
+    
+    finally:
+        if json_writer:
+            json_writer.close()
+            print(f"Results saved to {config.logging_file}")
+        
     print(f"All processed images saved in '{output_dir}' directory.")
 
     # generator = SyntheticDataGenerator(config)
