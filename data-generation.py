@@ -366,7 +366,7 @@ def main():
     try:
         json_writer = StreamingJSONWriter(config.logging_file)
         
-        for batch in tqdm(dataset_instance.process_data_in_batches(config.start_index, config.end_index, batch_size), desc = "Full Dataset Progress"):
+        for id, batch in enumerate(tqdm(dataset_instance.process_data_in_batches(config.start_index, config.end_index, batch_size), desc = "Full Dataset Progress")):
             for idx, sample in enumerate(tqdm(batch, desc="Processing Batch Images")):
                 try:
                     # Process image
@@ -384,6 +384,10 @@ def main():
                         "coord": convert_ndarray_to_list(coordinates)
                     }
                     json_writer.write_entry(box_list)
+                    
+                    #try to save machine's RAM
+                    del bounding_boxes
+                    del coordinates
 
                     # Save image
                     normal_image_path = os.path.join(output_dir, image_name)
