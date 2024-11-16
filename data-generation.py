@@ -402,6 +402,8 @@ def main():
                         normal_image.save(normal_image_path)
                     print("Image saved")
 
+                    del processed_image
+
                 except Exception as e:
                     print(f"Error processing sample {sample['name']}: {e}")
                     continue
