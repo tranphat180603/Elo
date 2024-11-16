@@ -366,7 +366,7 @@ def main():
     try:
         json_writer = StreamingJSONWriter(config.logging_file)
         
-        for id, batch in enumerate(tqdm(dataset_instance.process_data_in_batches(config.start_index, config.end_index, batch_size), desc = "Full Dataset Progress")):
+        for id, batch in enumerate(tqdm(dataset_instance.process_data_in_batches(config.start_index, config.end_index, batch_size), desc = "Full Dataset Progress", total=dataset_instance.select_data(config.start_index, config.end_index))):
             for idx, sample in enumerate(tqdm(batch, desc="Processing Batch Images")):
                 try:
                     # Process image
