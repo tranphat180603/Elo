@@ -364,10 +364,14 @@ def main():
     json_writer = None
     
     try:
+        full_ds = dataset_instance.select_data(config.start_index, config.end_index)    
         json_writer = StreamingJSONWriter(config.logging_file)
-        progress_bar = tqdm(total = dataset_instance.select_data(config.start_index, config.end_index), desc= "Full Dataset Progress")
-        for id, batch in dataset_instance.process_data_in_batches(config.start_index, config.end_index, batch_size):
+        progress_bar = tqdm(total = len(full_ds), desc= "Full Dataset Progress")
+        for batch in dataset_instance.process_data_in_batches(config.start_index, config.end_index, batch_size):
             for idx, sample in enumerate(tqdm(batch, desc="Processing Batch Images")):
+                if sample["name"] == "My eBay link":
+                    print("Skipping potential damaged image")
+                    continue
                 try:
                     # Process image
                     with torch.no_grad():
