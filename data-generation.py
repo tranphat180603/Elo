@@ -365,14 +365,14 @@ def main():
     
     try:
         json_writer = StreamingJSONWriter(config.logging_file)
-        
-        for id, batch in enumerate(tqdm(dataset_instance.process_data_in_batches(config.start_index, config.end_index, batch_size), desc = "Full Dataset Progress", total=dataset_instance.select_data(config.start_index, config.end_index))):
+        progress_bar = tqdm(total = dataset_instance.select_data(config.start_index, config.end_index), desc= "Full Dataset Progress")
+        for id, batch in dataset_instance.process_data_in_batches(config.start_index, config.end_index, batch_size):
             for idx, sample in enumerate(tqdm(batch, desc="Processing Batch Images")):
                 try:
                     # Process image
-                    print(f"Processing image: {sample['name']}")
                     with torch.no_grad():
                         processed_image, coordinates, bounding_boxes = image_processor.process_image(sample["image"])
+                    print(f"Processing image: {sample['name']}")
 
                     # Sanitize the image name
                     image_name = f"processed_image_{sanitize_filename(sample['name'])}.png"
@@ -401,6 +401,7 @@ def main():
                 except Exception as e:
                     print(f"Error processing sample {sample['name']}: {e}")
                     continue
+            progress_bar.update(batch_size)
 
             # Clear GPU cache after each batch
             torch.cuda.empty_cache()
