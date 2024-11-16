@@ -142,14 +142,12 @@ class ImageProcessor:
         self.som_model = som_model
         self.caption_model_processor = caption_model_processor
 
-    def process_image(self, image_base64: str) -> Tuple[Image.Image, List[str]]:
-        image_bytes = base64.b64decode(image_base64)
-        # Open the image using PIL
-        image = Image.open(BytesIO(image_bytes)).convert("RGB")
-        ocr_bbox_rslt, _ = self._perform_ocr(image)
+    def process_image(self, image: Image) -> Tuple[Image.Image, List[str]]:
+        img_source = image.convert("RGB")
+        img_arr = np.array(image)
+        ocr_bbox_rslt, _ = self._perform_ocr(img_arr)
         text, ocr_bbox = ocr_bbox_rslt[0], ocr_bbox_rslt[1]
-        
-        return self._get_labeled_image(image, ocr_bbox, text)
+        return self._get_labeled_image(img_source, ocr_bbox, text)
 
     def _perform_ocr(self, image: Image) -> Tuple[Any, Any]:
         return check_ocr_box(
@@ -182,7 +180,6 @@ class ImageProcessor:
             imgsz=640
         )
         return labeled_img, coords, content_list
-
 class SyntheticDataGenerator:
     def __init__(self, config: PipelineConfig):
         self.config = config
