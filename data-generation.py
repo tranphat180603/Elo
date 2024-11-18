@@ -64,75 +64,76 @@ class PipelineConfig:
 
 def get_enhanced_meta_prompt(level: str, parsed_content_list: List[str]) -> str:
     context_description = (
-        f"You are given an image with elements that have been bounded by boxes to increase precision. Here is the list of the bounding boxes on this screen and their corresponding elements:\n"
+        f"You are given a website screenshot with elements that have been bounded by boxes to increase precision. "
+        f"Here is the list of the bounding boxes on this screen and their corresponding elements:\n"
         f"{parsed_content_list}\n\n"
     )
     
-    enhanced_meta_prompts = {
-        "conversation": (
-            context_description +
-            "Imagine you are a helpful agent answering questions from a user who is exploring this website. Your role is to help the user understand the website's contents and functionalities in a conversational and supportive manner. Based on this information, create three user questions and provide appropriate responses in a conversational style.\n\n"
-            "Your job is to create 2 high-quality pairs of question response to simulate this situation. \n"
-            "Please respond ONLY in the following valid JSON format, without any additional commentary or formatting:\n"
-            "[\n"
-            "  {\n"
-            '    "question": "User question here",\n'
-            '    "response": "Assistant response here"\n'
-            "  },\n"
-            "  {\n"
-            '    "question": "Another user question",\n'
-            '    "response": "Another assistant response"\n'
-            "  }\n"
-            "]\n\n"
-            "Ensure that there is no text outside of the JSON structure, as this will be parsed directly. Follow these instructions strictly to avoid parsing errors."
-            "\n\n"
-            "- For the first question, make it brief and focused on some elements, such as asking about recent updates, a specific section, or basic site functionality. For example, 'What's new on the homepage?' or 'How do I check my notifications?'\n"
-            "- For the second question, make it the most detailed, covering questions about how different site sections interact or summarizing multiple updates. For example, 'Can you summarize today's updates from the news, notifications, and recommendations?' Avoid mentioning specific technical terms like 'box IDs' or 'coordinates.'"
-        ),
-        "description": (
-            context_description +
-            "Imagine you are an agent helping a user get an overview of the website's layout and its main sections. The user is curious about how the website is organized, and your job is to provide increasingly detailed descriptions in response to their questions.\n\n"
-            "Your job is to create 2 high-quality pairs of question response to simulate this situation.\n"
-            "Respond ONLY in the following valid JSON array format, without additional commentary:\n"
-            "[\n"
-            "  {\n"
-            '    "question": "User question here",\n'
-            '    "response": "Assistant response here"\n'
-            "  },\n"
-            "  {\n"
-            '    "question": "Another user question",\n'
-            '    "response": "Another assistant response"\n'
-            "  }\n"
-            "]\n\n"
-            "- The first response should cover multiple sections or a broader area of the site. For example: Tell me the name of some of my online friends on the right side of the page.'\n"
-            "- The second response should offer a comprehensive overview of the visible sections, such as 'What are the main parts of this page, including the sidebar, main content area, and footer?' or 'Can you summarize the features available across the dashboard?' Avoid mentioning specific technical terms like 'box IDs' or 'coordinates.'"
-        ),
-        "complex_tasks": (
-            context_description +
-            "Imagine you are guiding a user through interactions on a form-based webpage. The page you are helping with contains static elements such as text boxes, radio buttons, drop-down lists, and other similar input controls. Examples include hotel booking forms, travel site filters, registration forms, or product filters. The tasks do not involve any page transitions or loading of new elements—everything is visible from the start.\n\n"
-            "You must create three user questions that involve progressively complex tasks. These tasks should only use the elements that have bounding boxes attached to them, such as text boxes, buttons, radio buttons, or any input elements clearly indicated in the provided image. Focus solely on actions within this single page, and do not reference interactions that involve navigating away from the page or adding new content beyond what is visible.\n\n"
-            "Please respond ONLY in the following valid JSON format, without any additional text or commentary:\n"
-            "[\n"
-            "  {\n"
-            '    "question": "User question here",\n'
-            '    "response": "Step 1: Do this (Text Box ID 0: Gmail). Step 2: Then do this (Text Box ID 1: Google)."\n'
-            "  },\n"
-            "  {\n"
-            '    "question": "Another user question",\n'
-            '    "response": "Step 1: First step (Text Box ID 2: Log in). Step 2: Second step (Text Box ID 3: Log out)."\n'
-            "  }\n"
-            "]\n\n"
-            
-            "Guidelines for generating responses:\n"
-            "- First question: Create a simple task that involves interacting with 1-2 elements, such as entering information into one or two text boxes or selecting a radio button.\n"
-            "- Second question: Create a task that involves 2-3 steps, such as filling in multiple text boxes or making a combination of text input and selection, like a drop-down list and a radio button.\n"
-            "- Third question: Create a complex task that involves interacting with 3-4 different elements on the form, such as filling out multiple text boxes, selecting multiple options, or adjusting settings via different input elements.\n\n"
-            
-            "Important:\n"
-            "- Ensure each action only involves elements with bounding boxes—do not include any interaction with elements that are not clearly indicated with bounding boxes.\n"
-            "- Include box IDs in parentheses after mentioning any element to clearly identify which part of the interface to interact with (e.g., 'Select Gmail ('Text Box ID 0: Gmail')').\n"
-        )
-    }
+    enhanced_meta_prompts =  {
+    "conversation": (
+        context_description +
+        "Imagine you are a helpful agent operating automatically on the website and know everything about it. "
+        "At the same time, you are also a user looking at a website and want to ask the agent and receive helpful answers from it. "
+        "You must play both roles in this simulation and formulate good conversations between these two entities. \n\n"
+        "Context: The user is currently looking at the website. They are approaching the website and trying to know everything possible about it: "
+        "main purpose, the content, advertisements, functionalities—everything possible. The agent's role is to answer the user's questions in a helpful and informative way.\n\n"
+        "Important: Ensure that the conversation uses diverse and natural vocabularies to avoid sounding overly robotic or fixed in tone.\n\n"
+        "Based on this information, create 5 diverse, meaningful sets of conversations between these two entities. \n"
+        "Please respond ONLY in the following valid JSON format, without any additional commentary or formatting:\n"
+        "[\n"
+        "  {\n"
+        '    "question": "User question here",\n'
+        '    "response": "Assistant response here"\n'
+        "  },\n"
+        "  {\n"
+        '    "question": "Another user question",\n'
+        '    "response": "Another assistant response"\n'
+        "  }\n"
+        "]\n\n"
+        "Ensure that there is no text outside of the JSON structure, as this will be parsed directly. Follow these instructions strictly to avoid parsing errors.\n\n"
+    ),
+
+    "description": (
+        context_description +
+        "Imagine you are a helpful agent operating automatically on the website and know everything about it. "
+        "At the same time, you are also a user looking at a website and want to ask the agent and receive helpful answers from it. "
+        "You must play both roles in this simulation and formulate good conversations between these two entities.\n\n"
+        "Context: The user is currently looking at the website, trying to get an overall description of it. They are looking at a new website and would like to know "
+        "important information about it. The agent will respond with an informative, condensed paragraph of the description. The description should capture all important information.\n\n"
+        "Important: Ensure that the description is written in a natural and engaging way, avoiding robotic phrasing and repetitive vocabulary.\n\n"
+        "Respond ONLY in the following valid JSON array format, without additional commentary:\n"
+        "[\n"
+        "  {\n"
+        '    "question": "User question here",\n'
+        '    "response": "Assistant response here"\n'
+        "  }\n"
+        "]\n"
+    ),
+
+    "complex_tasks": (
+        context_description +
+        "Imagine you are a helpful agent operating automatically on the website and know everything about it. "
+        "At the same time, you are also a user looking at a website and want to ask the agent and receive helpful answers from it. "
+        "You must play both roles in this simulation and formulate good conversations between these two entities. \n\n"
+        "Context: The user is trying to command the agent to execute tasks on the website based on the current UI of the web. "
+        "The action must involve multiple steps (4–5 actions) and must be grounded directly in the current UI of the web. This means the action must be possible given the elements "
+        "present in the UI and not speculate about or guess functions that do not exist in the current image. The agent will act as an independent and automatic agent, "
+        "reporting to the user step-by-step what it will do to achieve the goal. The agent must utilize the necessary elements in the image to achieve that goal. "
+        "When referring to elements, the agent should attach the text box ID of the bounding boxes bounding that element to ensure grounded and truthful instructions. "
+        "After that, the agent must determine and derive the first and foremost action it will perform specifically.\n\n"
+        "Please respond ONLY in the following valid JSON format, without any additional text or commentary:\n"
+        "[\n"
+        "  {\n"
+        '    "question": "User question here",\n'
+        '    "Instruction": "Step 1: Do this (Text Box ID 0: Gmail). Step 2: Then do this (Text Box ID 1: Google).",\n'
+        '    "Next action": "What is able to be done first based on the plan that has been created?"\n'
+        "  }\n"
+        "]\n\n"
+        "Important:\n"
+        "- Ensure each action only involves elements with bounding boxes—do not include any interaction with elements that are not clearly indicated with bounding boxes.\n"
+        "- Include box IDs in parentheses after mentioning any element to clearly identify which part of the interface to interact with (e.g., 'Select Gmail (Text Box ID 0: Gmail)').\n"
+    )
+}
 
 
     return enhanced_meta_prompts[level]
@@ -346,86 +347,86 @@ def main():
     # load models
     load_and_save_model()
 
-    output_dir = "processed_images"
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    # output_dir = "processed_images"
+    # if not os.path.exists(output_dir):
+    #     os.makedirs(output_dir)
 
-    som_model = get_yolo_model(model_path='OmniParser/weights/icon_detect/best.pt')
-    caption_model_processor = get_caption_model_processor(model_name="blip2", model_name_or_path="OmniParser/weights/icon_caption_blip2")
-    image_processor = ImageProcessor(som_model, caption_model_processor)
+    # som_model = get_yolo_model(model_path='OmniParser/weights/icon_detect/best.pt')
+    # caption_model_processor = get_caption_model_processor(model_name="blip2", model_name_or_path="OmniParser/weights/icon_caption_blip2")
+    # image_processor = ImageProcessor(som_model, caption_model_processor)
     
-    batch_size = 20  
-    box_prop_name = config.logging_file
-    print(f"Logging in file {box_prop_name}")
+    # batch_size = 20  
+    # box_prop_name = config.logging_file
+    # print(f"Logging in file {box_prop_name}")
     
-    dataset_instance = Dataset()
-    json_writer = None
+    # dataset_instance = Dataset()
+    # json_writer = None
     
-    try:
-        full_ds = dataset_instance.select_data(config.start_index, config.end_index)    
-        json_writer = StreamingJSONWriter(config.logging_file)
-        progress_bar = tqdm(total = len(full_ds), desc= "Full Dataset Progress")
-        for batch in dataset_instance.process_data_in_batches(config.start_index, config.end_index, batch_size):
-            for idx, sample in enumerate(tqdm(batch, desc="Processing Batch Images")):
-                if sample["name"] == "My eBay link":
-                    print("Skipping potential damaged image")
-                    continue
-                try:
-                    # Process image
-                    with torch.no_grad():
-                        processed_image, coordinates, bounding_boxes = image_processor.process_image(sample["image"])
-                    print(f"Processing image: {sample['name']}")
+    # try:
+    #     full_ds = dataset_instance.select_data(config.start_index, config.end_index)    
+    #     json_writer = StreamingJSONWriter(config.logging_file)
+    #     progress_bar = tqdm(total = len(full_ds), desc= "Full Dataset Progress")
+    #     for batch in dataset_instance.process_data_in_batches(config.start_index, config.end_index, batch_size):
+    #         for idx, sample in enumerate(tqdm(batch, desc="Processing Batch Images")):
+    #             if sample["name"] == "My eBay link":
+    #                 print("Skipping potential damaged image")
+    #                 continue
+    #             try:
+    #                 # Process image
+    #                 with torch.no_grad():
+    #                     processed_image, coordinates, bounding_boxes = image_processor.process_image(sample["image"])
+    #                 print(f"Processing image: {sample['name']}")
 
-                    # Sanitize the image name
-                    image_name = f"processed_image_{sanitize_filename(sample['name'])}.png"
+    #                 # Sanitize the image name
+    #                 image_name = f"processed_image_{sanitize_filename(sample['name'])}.png"
 
-                    # Create and write JSON entry
-                    box_list = {
-                        "image_name": image_name,
-                        "boxes_content": convert_ndarray_to_list(bounding_boxes),
-                        "coord": convert_ndarray_to_list(coordinates)
-                    }
-                    json_writer.write_entry(box_list)
+    #                 # Create and write JSON entry
+    #                 box_list = {
+    #                     "image_name": image_name,
+    #                     "boxes_content": convert_ndarray_to_list(bounding_boxes),
+    #                     "coord": convert_ndarray_to_list(coordinates)
+    #                 }
+    #                 json_writer.write_entry(box_list)
                     
-                    #try to save machine's RAM
-                    del bounding_boxes
-                    del coordinates
+    #                 #try to save machine's RAM
+    #                 del bounding_boxes
+    #                 del coordinates
 
-                    # Save image
-                    normal_image_path = os.path.join(output_dir, image_name)
-                    if isinstance(processed_image, Image.Image):
-                        processed_image.save(normal_image_path)
-                    else:
-                        normal_image = Image.open(BytesIO(base64.b64decode(processed_image)))
-                        normal_image.save(normal_image_path)
-                    print("Image saved")
+    #                 # Save image
+    #                 normal_image_path = os.path.join(output_dir, image_name)
+    #                 if isinstance(processed_image, Image.Image):
+    #                     processed_image.save(normal_image_path)
+    #                 else:
+    #                     normal_image = Image.open(BytesIO(base64.b64decode(processed_image)))
+    #                     normal_image.save(normal_image_path)
+    #                 print("Image saved")
 
-                    del processed_image
+    #                 del processed_image
 
-                except Exception as e:
-                    print(f"Error processing sample {sample['name']}: {e}")
-                    continue
-            progress_bar.update(batch_size)
+    #             except Exception as e:
+    #                 print(f"Error processing sample {sample['name']}: {e}")
+    #                 continue
+    #         progress_bar.update(batch_size)
 
-            # Clear GPU cache after each batch
-            torch.cuda.empty_cache()
+    #         # Clear GPU cache after each batch
+    #         torch.cuda.empty_cache()
 
-    except Exception as e:
-        print(f"An error occurred during processing: {e}")
+    # except Exception as e:
+    #     print(f"An error occurred during processing: {e}")
     
-    finally:
-        if json_writer:
-            json_writer.close()
-            print(f"Results saved to {config.logging_file}")
+    # finally:
+    #     if json_writer:
+    #         json_writer.close()
+    #         print(f"Results saved to {config.logging_file}")
         
-    print(f"All processed images saved in '{output_dir}' directory.")
+    # print(f"All processed images saved in '{output_dir}' directory.")
 
-    # generator = SyntheticDataGenerator(config)
-    # formatted_data = generator._generate_conversation_data(dataset)
+    generator = SyntheticDataGenerator(config)
+    formatted_data = generator._generate_conversation_data(dataset)
     
-    # with open(config.output_file, "w") as f:
-    #     json.dump(formatted_data, f, indent=4)
-    # print(f"Data saved to {config.output_file}")
+    with open(config.output_file, "w") as f:
+        json.dump(formatted_data, f, indent=4)
+    print(f"Data saved to {config.output_file}")
 
 if __name__ == "__main__":
     main()
