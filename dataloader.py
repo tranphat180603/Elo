@@ -21,3 +21,9 @@ import shutil
 #push entire folder to hub
 ds = load_dataset("imagefolder", data_dir = "processed_images")
 ds.push_to_hub("tranphat1806/UI-tron")
+
+
+#process data
+
+#Loc ra hinh anh co bounding boxes > threshold
+#complex image => complex tasks on a single website
