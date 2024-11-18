@@ -37,6 +37,7 @@ def load_and_save_model():
         model.load_state_dict(tensor_dict)
         torch.save({'model':model}, 'OmniParser/weights/icon_detect/best.pt')
         print("Converted safetensors to pt successfully!")
+
 def sanitize_filename(filename):
     return filename.replace("/", "_").replace("\\", "_").replace(" ", "_")
 
@@ -121,7 +122,7 @@ def get_enhanced_meta_prompt(level: str, parsed_content_list: List[str]) -> str:
         "reporting to the user step-by-step what it will do to achieve the goal. The agent must utilize the necessary elements in the image to achieve that goal. "
         "When referring to elements, the agent should attach the text box ID of the bounding boxes bounding that element to ensure grounded and truthful instructions. "
         "After that, the agent must determine and derive the first and foremost action it will perform specifically.\n\n"
-        "Please respond ONLY in the following valid JSON format, without any additional text or commentary:\n"
+        "Respond ONLY in the following valid JSON array format, without additional commentary:\n"
         "[\n"
         "  {\n"
         '    "question": "User question here",\n'
@@ -181,14 +182,24 @@ class ImageProcessor:
             imgsz=640
         )
         return labeled_img, coords, content_list
+    
 class SyntheticDataGenerator:
     def __init__(self, config: PipelineConfig):
         self.config = config
+        print("Initializing VLM model...")
         self.vlm_model, self.processor = self._initialize_vlm_model()
+        print("Initializing SOM model and image processor...")
         self.image_processor = ImageProcessor(
             self._initialize_som_model(),
             self._initialize_caption_processor()
         )
+        self.output_dir = "processed_images"
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
+        
+        # Initialize JSON writers
+        self.box_writer = StreamingJSONWriter(self.config.logging_file)
+        self.conversation_writer = StreamingJSONWriter(self.config.output_file)
 
     def _initialize_vlm_model(self):
         model = MllamaForConditionalGeneration.from_pretrained(
@@ -214,78 +225,169 @@ class SyntheticDataGenerator:
             model_name_or_path=self.config.caption_model_path,
             device='cuda'
         )
+    
+    def process_and_write_sample(self, sample: Dict) -> Tuple[str, List[str]]:
+        """Process a single sample and write box properties to logging file"""
+        try:
+            # Process image
+            with torch.no_grad():
+                processed_image, coordinates, bounding_boxes = self.image_processor.process_image(sample["image"])
+            
+            # Save processed image
+            image_name = f"processed_image_{sanitize_filename(sample['name'])}.png"
+            image_path = os.path.join(self.output_dir, image_name)
+            
+            if isinstance(processed_image, Image.Image):
+                processed_image.save(image_path)
+                print(f"Saved processed image: {image_name}")
 
-    def _generate_conversation_data(self, dataset: List[Dict]) -> List[Dict]:
-        conversation_data = []
+            # Create box list for logging
+            box_data = {
+                "image_name": image_name,
+                "boxes_content": convert_ndarray_to_list(bounding_boxes),
+                "coord": convert_ndarray_to_list(coordinates)
+            }
+            
+            # Write to logging file
+            self.box_writer.write_entry(box_data)
+            return image_path, bounding_boxes
+
+        except Exception as e:
+            print(f"Error processing image {sample['name']}: {str(e)}")
+            raise
+        
+    def generate_conversation_data(self, image_path: str, content_list: List[str]):
+        """Generate and write conversation data for all levels"""
+        try:
+            levels = ["conversation", "description", "complex_tasks"]
+            formatted_data = {
+                "id": "image_00",
+                "image": {
+                    f"<image_00>": image_path  # Map single image path
+                },
+                "conversations": []
+            }
+            for level in levels:
+                # Generate conversation for each level
+                conversation = self._generate_single_level_conversation(image_path, content_list, level, "<image_00>")
+                if conversation:
+                    formatted_data["conversations"].extend(conversation)
+
+            # Write the final formatted data
+            self.conversation_writer.write_entry([formatted_data])
+
+        except Exception as e:
+            print(f"Error generating conversations for {image_path}: {str(e)}")
+            raise
+
+
+    def _generate_single_level_conversation(self, image_path: str, content_list: List[str], level: str, image_tag: str) -> List[Dict]:
+        """Generate conversation data for a single level"""
         num_retry = 5
-        for item in tqdm(dataset, desc = "Generating data"):
-            labeled_img, _, content_list = self.image_processor.process_image(item["image"])
-            for level in ["conversation", "description", "complex_tasks"]:
-                meta_prompt = get_enhanced_meta_prompt(level, content_list)
-                image = Image.open(BytesIO(base64.b64decode(labeled_img)))
-                # Format messages for Llama
-                messages = [
-                    {"role": "user", "content": [
-                        {"type": "image"},
-                        {"type": "text", "text": meta_prompt}
-                    ]}
-                ]
-                
-                response_data = None
-                for n in range(num_retry):
-                    seed_value = random.randint(0, 10000)
-                    random.seed(seed_value)
-                    
-                    try:
-                        self.vlm_model.tie_weights()
-                        # Process input using Llama format
-                        input_text = self.processor.apply_chat_template(messages, add_generation_prompt=True)
-                        inputs = self.processor(
-                            image,
-                            input_text,
-                            add_special_tokens=False,
-                            return_tensors="pt"
-                        ).to(self.vlm_model.device)
-                        # Generate response
-                        output = self.vlm_model.generate(
-                            **inputs,
-                            max_new_tokens=1024,
-                            temperature=0.7,
-                            top_p=0.9
-                        )
-                        output = [
-                            output_ids[len(input_ids):] for input_ids, output_ids in zip(inputs.input_ids, output)
-                        ]
-                        response = self.processor.decode(output[0], skip_special_tokens=True)                        
-                        print(f"Raw Response (Attempt {n+1}, Seed {seed_value}): {response}", flush=True)
+        meta_prompt = get_enhanced_meta_prompt(level, content_list)
+        image = Image.open(image_path)
+        # Lists of diverse prefixes
+        instruction_prefixes = [
+            "Here are the steps:",
+            "Step-by-step guide:",
+            "Follow these directions:",
+            "Here’s how to proceed:",
+            "Detailed steps:",
+            "Steps to follow:",
+            "Process outline:",
+            "Here’s what to do:",
+            "Let’s break it down:",
+            "Guidelines to complete the task:"
+        ]
 
-                        if isinstance(response, str):
-                            try:
-                                response_data = json.loads(response)
-                                break
-                            except json.JSONDecodeError:
-                                print(f"JSON decode error on attempt {n+1}, retrying...")
-                        elif isinstance(response, (list, dict)):
-                            response_data = response
-                            break
+        next_action_prefixes = [
+            "Your next step is:",
+            "The following action is:",
+            "Here’s what you should do next:",
+            "Proceed with the following step:",
+            "The next move is:",
+            "What’s next:",
+            "Next up, you need to:",
+            "Following this, take this action:",
+            "Here’s the upcoming step:",
+            "Advance to the next step:"
+        ]
+        # Prepare user message
+        messages = [
+            {"role": "user", "content": [
+                {"type": "image"},
+                {"type": "text", "text": meta_prompt}
+            ]}
+        ]
 
-                    except Exception as e:
-                        print(f"Error during generation (Attempt {n+1}): {str(e)}")
-                        continue
+        for attempt in range(num_retry):
+            try:
+                # Process input
+                input_text = self.processor.apply_chat_template(messages, add_generation_prompt=True)
+                inputs = self.processor(
+                    image,
+                    input_text,
+                    add_special_tokens=False,
+                    return_tensors="pt"
+                ).to(self.vlm_model.device)
 
-                if response_data is None:
-                    print(f"Failed to parse response after {num_retry} attempts.", flush=True)
+                # Generate response
+                output = self.vlm_model.generate(
+                    **inputs,
+                    max_new_tokens=1024,
+                    temperature=0.7,
+                    top_p=0.9
+                )
+                output_text = self.processor.decode(
+                    output[0][len(inputs.input_ids[0]):],
+                    skip_special_tokens=True
+                )
+
+                # Parse response
+                try:
+                    response_data = json.loads(output_text)
+                    formatted_conversation = []
+                    if level == "conversation" or level == "description":
+                        formatted_conversation.append({
+                            "role": f"user \n {image_tag}",
+                            "content": item["question"]
+                        })
+                        formatted_conversation.append({
+                            "role": "assistant",
+                            "content": item["response"]
+                        })
+
+                    elif level == "complex_tasks":
+                        instruction_prefix = random.choice(instruction_prefixes)
+                        next_action_prefix = random.choice(next_action_prefixes)
+                        for item in response_data:
+                            formatted_conversation.append({
+                                "role": f"user \n {image_tag}",
+                                "content": item["question"]
+                            })
+                            formatted_conversation.append({
+                                "role": "assistant",
+                                "content": f"{instruction_prefix} {item['Instruction']}\n{next_action_prefix} {item['Next action']}"
+                            })
+                    else:
+                        formatted_conversation = []
+                    return formatted_conversation
+
+                except json.JSONDecodeError:
+                    print(f"Failed to parse JSON on attempt {attempt + 1}")
                     continue
+            except Exception as e:
+                print(f"Generation error on attempt {attempt + 1}: {str(e)}")
+                continue
 
-                print(f"Processed Response: {response_data}", flush=True)
+        print(f"Failed to generate valid response for level {level} after {num_retry} attempts")
+        return []
 
-                for item in response_data:
-                    conversation_data.append({
-                        "user": item["question"],
-                        "assistant": item["response"],
-                    })
 
-        return conversation_data
+    
+    def close_writer(self):
+        self.box_writer.close()
+        self.conversation_writer.close()
 
 
 class Dataset:
@@ -331,102 +433,71 @@ class StreamingJSONWriter:
             f.write('\n]')
 
 def main():
+    # Parse arguments and create config
     parser = argparse.ArgumentParser(description="Synthetic Data Generation Pipeline")
     parser.add_argument("--vlm_model_name", type=str, default="meta-llama/Llama-3.2-90B-Vision-Instruct")
     parser.add_argument("--yolo_model_path", type=str, default="OmniParser/weights/icon_detect/best.pt")
     parser.add_argument("--caption_model_name", type=str, default="blip2")
     parser.add_argument("--caption_model_path", type=str, default="OmniParser/weights/icon_caption_blip2")
     parser.add_argument("--output_file", type=str, default="data.json")
-    parser.add_argument("--logging_file", type=str, default="box_prop1.json")
-    parser.add_argument("--start_index", type=int, default=0, help="Starting index for dataset split")
-    parser.add_argument("--end_index", type=int, help="Ending index for dataset split")
+    parser.add_argument("--logging_file", type=str, default="box_prop.json")
+    parser.add_argument("--start_index", type=int, default=0)
+    parser.add_argument("--end_index", type=int, default=None)
+    parser.add_argument("--batch_size", type=int, default=20)
     
     args = parser.parse_args()
     config = PipelineConfig(**vars(args))
     
-    # load models
+    # Initialize components
+    print("Loading models...")
     load_and_save_model()
-
-    # output_dir = "processed_images"
-    # if not os.path.exists(output_dir):
-    #     os.makedirs(output_dir)
-
-    # som_model = get_yolo_model(model_path='OmniParser/weights/icon_detect/best.pt')
-    # caption_model_processor = get_caption_model_processor(model_name="blip2", model_name_or_path="OmniParser/weights/icon_caption_blip2")
-    # image_processor = ImageProcessor(som_model, caption_model_processor)
     
-    # batch_size = 20  
-    # box_prop_name = config.logging_file
-    # print(f"Logging in file {box_prop_name}")
-    
-    # dataset_instance = Dataset()
-    # json_writer = None
-    
-    # try:
-    #     full_ds = dataset_instance.select_data(config.start_index, config.end_index)    
-    #     json_writer = StreamingJSONWriter(config.logging_file)
-    #     progress_bar = tqdm(total = len(full_ds), desc= "Full Dataset Progress")
-    #     for batch in dataset_instance.process_data_in_batches(config.start_index, config.end_index, batch_size):
-    #         for idx, sample in enumerate(tqdm(batch, desc="Processing Batch Images")):
-    #             if sample["name"] == "My eBay link":
-    #                 print("Skipping potential damaged image")
-    #                 continue
-    #             try:
-    #                 # Process image
-    #                 with torch.no_grad():
-    #                     processed_image, coordinates, bounding_boxes = image_processor.process_image(sample["image"])
-    #                 print(f"Processing image: {sample['name']}")
-
-    #                 # Sanitize the image name
-    #                 image_name = f"processed_image_{sanitize_filename(sample['name'])}.png"
-
-    #                 # Create and write JSON entry
-    #                 box_list = {
-    #                     "image_name": image_name,
-    #                     "boxes_content": convert_ndarray_to_list(bounding_boxes),
-    #                     "coord": convert_ndarray_to_list(coordinates)
-    #                 }
-    #                 json_writer.write_entry(box_list)
-                    
-    #                 #try to save machine's RAM
-    #                 del bounding_boxes
-    #                 del coordinates
-
-    #                 # Save image
-    #                 normal_image_path = os.path.join(output_dir, image_name)
-    #                 if isinstance(processed_image, Image.Image):
-    #                     processed_image.save(normal_image_path)
-    #                 else:
-    #                     normal_image = Image.open(BytesIO(base64.b64decode(processed_image)))
-    #                     normal_image.save(normal_image_path)
-    #                 print("Image saved")
-
-    #                 del processed_image
-
-    #             except Exception as e:
-    #                 print(f"Error processing sample {sample['name']}: {e}")
-    #                 continue
-    #         progress_bar.update(batch_size)
-
-    #         # Clear GPU cache after each batch
-    #         torch.cuda.empty_cache()
-
-    # except Exception as e:
-    #     print(f"An error occurred during processing: {e}")
-    
-    # finally:
-    #     if json_writer:
-    #         json_writer.close()
-    #         print(f"Results saved to {config.logging_file}")
-        
-    # print(f"All processed images saved in '{output_dir}' directory.")
-
+    dataset_instance = Dataset()
     generator = SyntheticDataGenerator(config)
-    formatted_data = generator._generate_conversation_data(dataset)
     
-    with open(config.output_file, "w") as f:
-        json.dump(formatted_data, f, indent=4)
-    print(f"Data saved to {config.output_file}")
+    try:
+        # Get full dataset
+        full_ds = dataset_instance.select_data(config.start_index, config.end_index)
+        total_samples = len(full_ds)
+        
+        # Process in batches
+        with tqdm(total=total_samples, desc="Processing samples") as pbar:
+            for batch in dataset_instance.process_data_in_batches(
+                config.start_index, 
+                config.end_index, 
+                args.batch_size
+            ):
+                # Process each sample in batch
+                for sample in batch:
+                    try:
+                        # Process image and write box data
+                        image_path, content_list = generator.process_and_write_sample(sample)
+                        
+                        # Generate and write conversation data
+                        generator.generate_conversation_data(image_path, content_list)
+
+                        print(f"Having saved: {len(os.listdir("processed_images"))}/{total_samples} images so far. ")
+                        with open(config.logging_file, "r") as file:
+                            data = json.load(file)
+                        num_box_prop = len(data)
+                        print(f"Having saved: {num_box_prop}/{total_samples} samples in logging file so far. ")
+                        pbar.update(1)
+                        
+                    except Exception as e:
+                        print(f"Error processing sample {sample['name']}: {str(e)}")
+                        continue
+                
+                # Clear GPU cache after each batch
+                torch.cuda.empty_cache()
+    
+    except Exception as e:
+        print(f"Fatal error during processing: {str(e)}")
+        raise
+    
+    finally:
+        # Close JSON writers
+        generator.close_writer()
+        print(f"Results saved to {config.logging_file} and {config.output_file}")
 
 if __name__ == "__main__":
     main()
