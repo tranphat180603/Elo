@@ -135,8 +135,6 @@ def get_enhanced_meta_prompt(level: str, parsed_content_list: List[str]) -> str:
         "- Include box IDs in parentheses after mentioning any element to clearly identify which part of the interface to interact with (e.g., 'Select Gmail (Text Box ID 0: Gmail)').\n"
     )
 }
-
-
     return enhanced_meta_prompts[level]
 
 class ImageProcessor:
@@ -193,11 +191,10 @@ class SyntheticDataGenerator:
             self._initialize_som_model(),
             self._initialize_caption_processor()
         )
-        self.output_dir = "processed_images"
+        self.output_dir = "Elo/processed_images/train"
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
         
-        # Initialize JSON writers
         self.box_writer = StreamingJSONWriter(self.config.logging_file)
         self.conversation_writer = StreamingJSONWriter(self.config.output_file)
 
@@ -228,6 +225,7 @@ class SyntheticDataGenerator:
     
     def process_and_write_sample(self, sample: Dict) -> Tuple[str, List[str]]:
         """Process a single sample and write box properties to logging file"""
+        image_dir = "Elo/proccesed_images"
         try:
             # Process image
             with torch.no_grad():
@@ -236,26 +234,34 @@ class SyntheticDataGenerator:
             # Save processed image
             image_name = f"processed_image_{sanitize_filename(sample['name'])}.png"
             image_path = os.path.join(self.output_dir, image_name)
-            
-            if isinstance(processed_image, Image.Image):
-                processed_image.save(image_path)
-                print(f"Saved processed image: {image_name}")
 
-            # Create box list for logging
-            box_data = {
-                "image_name": image_name,
-                "boxes_content": convert_ndarray_to_list(bounding_boxes),
-                "coord": convert_ndarray_to_list(coordinates)
-            }
-            
-            # Write to logging file
-            self.box_writer.write_entry(box_data)
-            return image_path, bounding_boxes
+            # Check if the processed image is valid and save it
+            if isinstance(processed_image, Image.Image):
+                try:
+                    processed_image.save(image_path)
+                    print(f"Saved processed image: {image_name}")
+
+                    # Create box list for logging
+                    box_data = {
+                        "image_name": image_name,
+                        "boxes_content": convert_ndarray_to_list(bounding_boxes),
+                        "coord": convert_ndarray_to_list(coordinates)
+                    }
+
+                    # Write to logging file only if the image is successfully saved
+                    self.box_writer.write_entry(box_data)
+                    return image_path, bounding_boxes
+
+                except Exception as save_error:
+                    print(f"Failed to save image {image_name}: {str(save_error)}")
+                    raise save_error  # Stop processing this sample if image saving fails
+            else:
+                raise ValueError(f"Invalid processed image for {sample['name']}.")
 
         except Exception as e:
             print(f"Error processing image {sample['name']}: {str(e)}")
             raise
-        
+
     def generate_conversation_data(self, image_path: str, content_list: List[str]):
         """Generate and write conversation data for all levels"""
         try:
@@ -286,7 +292,7 @@ class SyntheticDataGenerator:
         num_retry = 5
         meta_prompt = get_enhanced_meta_prompt(level, content_list)
         image = Image.open(image_path)
-        # Lists of diverse prefixes
+        # Lists of diverse prefixes. The purpose is to not fixate any kind of response/word into the model.
         instruction_prefixes = [
             "Here are the steps:",
             "Step-by-step guide:",
@@ -321,75 +327,69 @@ class SyntheticDataGenerator:
         ]
 
         for attempt in range(num_retry):
+            # Process input
+            input_text = self.processor.apply_chat_template(messages, add_generation_prompt=True)
+            inputs = self.processor(
+                image,
+                input_text,
+                add_special_tokens=False,
+                return_tensors="pt"
+            ).to(self.vlm_model.device)
+
+            # Generate response
+            output = self.vlm_model.generate(
+                **inputs,
+                max_new_tokens=1024,
+                temperature=0.7,
+                top_p=0.9
+            )
+            output_text = self.processor.decode(
+                output[0][len(inputs.input_ids[0]):],
+                skip_special_tokens=True
+            )
+
+            # Parse response
             try:
-                # Process input
-                input_text = self.processor.apply_chat_template(messages, add_generation_prompt=True)
-                inputs = self.processor(
-                    image,
-                    input_text,
-                    add_special_tokens=False,
-                    return_tensors="pt"
-                ).to(self.vlm_model.device)
+                response_data = json.loads(output_text)
+                formatted_conversation = []
+                if level == "conversation" or level == "description":
+                    formatted_conversation.append({
+                        "role": f"user \n {image_tag}",
+                        "content": item["question"]
+                    })
+                    formatted_conversation.append({
+                        "role": "assistant",
+                        "content": item["response"]
+                    })
 
-                # Generate response
-                output = self.vlm_model.generate(
-                    **inputs,
-                    max_new_tokens=1024,
-                    temperature=0.7,
-                    top_p=0.9
-                )
-                output_text = self.processor.decode(
-                    output[0][len(inputs.input_ids[0]):],
-                    skip_special_tokens=True
-                )
-
-                # Parse response
-                try:
-                    response_data = json.loads(output_text)
-                    formatted_conversation = []
-                    if level == "conversation" or level == "description":
+                elif level == "complex_tasks":
+                    instruction_prefix = random.choice(instruction_prefixes)
+                    next_action_prefix = random.choice(next_action_prefixes)
+                    for item in response_data:
                         formatted_conversation.append({
                             "role": f"user \n {image_tag}",
                             "content": item["question"]
                         })
                         formatted_conversation.append({
                             "role": "assistant",
-                            "content": item["response"]
+                            "content": f"{instruction_prefix} {item['Instruction']}\n{next_action_prefix} {item['Next action']}"
                         })
+                else:
+                    formatted_conversation = []
+                return formatted_conversation
 
-                    elif level == "complex_tasks":
-                        instruction_prefix = random.choice(instruction_prefixes)
-                        next_action_prefix = random.choice(next_action_prefixes)
-                        for item in response_data:
-                            formatted_conversation.append({
-                                "role": f"user \n {image_tag}",
-                                "content": item["question"]
-                            })
-                            formatted_conversation.append({
-                                "role": "assistant",
-                                "content": f"{instruction_prefix} {item['Instruction']}\n{next_action_prefix} {item['Next action']}"
-                            })
-                    else:
-                        formatted_conversation = []
-                    return formatted_conversation
-
-                except json.JSONDecodeError:
-                    print(f"Failed to parse JSON on attempt {attempt + 1}")
-                    continue
-            except Exception as e:
-                print(f"Generation error on attempt {attempt + 1}: {str(e)}")
+            except json.JSONDecodeError:
+                print(f"Failed to parse JSON on attempt {attempt + 1}")
                 continue
 
         print(f"Failed to generate valid response for level {level} after {num_retry} attempts")
         return []
-
-
     
     def close_writer(self):
         self.box_writer.close()
         self.conversation_writer.close()
 
-
+#inference nen minh k nghi load data theo batch o day no se co ich loi gi
 class Dataset:
     def __init__(self):
         # Load dataset and apply default filter
@@ -472,15 +472,15 @@ def main():
                     try:
                         # Process image and write box data
                         image_path, content_list = generator.process_and_write_sample(sample)
-                        
-                        # Generate and write conversation data
-                        generator.generate_conversation_data(image_path, content_list)
 
                         print(f"Having saved: {len(os.listdir("processed_images"))}/{total_samples} images so far. ")
                         with open(config.logging_file, "r") as file:
                             data = json.load(file)
                         num_box_prop = len(data)
+
                         print(f"Having saved: {num_box_prop}/{total_samples} samples in logging file so far. ")
+                        # Generate and write conversation data
+                        generator.generate_conversation_data(image_path, content_list)
                         pbar.update(1)
                         
                     except Exception as e:
@@ -497,7 +497,7 @@ def main():
     finally:
         # Close JSON writers
         generator.close_writer()
-        print(f"Results saved to {config.logging_file} and {config.output_file}")
+        print(f"WE, AS NEWCOMERS, HAVE ACHIEVED INTELLIGENCE!!!")
 
 if __name__ == "__main__":
     main()

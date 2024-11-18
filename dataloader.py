@@ -6,7 +6,7 @@ import shutil
 def push_images_to_hub():
     ds = load_dataset(
         "imagefolder",
-        data_files="processed_images/*/.png",  # Explicitly specify PNG files
+        data_files="processed_images/*/.png",
         split="train"
     )
     ds.push_to_hub("tranphat1806/UI-tron")
