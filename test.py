@@ -96,15 +96,15 @@ responses = []
 i = 0
 img_files = []
 for img_file in os.listdir(img_dir):
-    if img_file.startswith("p_test"):
+    if img_file.startswith("test-omni"):
         img_files.append(img_file)
 
 for image_file in img_files:
-    parsed_content_list = box_prop[i]
+    # parsed_content_list = box_prop[i]
     i += 1
     for prompt_block in prompts:
         for question in prompt_block:
-            question = context_description + question
+            # question = context_description + question
             image_dir = os.path.join(img_dir, image_file)   
             image = Image.open(image_dir).convert('RGB')
             msgs = [{'role': 'user', 'content': [image, question]}]
@@ -119,5 +119,5 @@ for image_file in img_files:
             print(f"Question: {question}")
             print(response)
     print(f"DONE PLAYING WITH IMAGE {image_file}")
-with open("minicpm-testing.txt", "w") as file:
+with open("minicpm-testing-noboxes.txt", "w") as file:
     file.write("\n".join(responses))
