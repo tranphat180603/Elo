@@ -169,7 +169,7 @@ def get_parsed_content_icon_phi3v(filtered_boxes, ocr_bbox, image_source, captio
 
     return generated_texts
 
-def remove_overlap(boxes, iou_threshold, image_size=None, max_width_ratio=0.4, max_absolute_width=None, ocr_bbox=None):
+def remove_overlap(boxes, iou_threshold, image_size=None, max_width_ratio=0.6, max_absolute_width=None, ocr_bbox=None):
     assert ocr_bbox is None or isinstance(ocr_bbox, List)
 
     def box_area(box):

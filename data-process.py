@@ -2,6 +2,19 @@
 #open and concat JSON into 1
 #new JSON file with samples that exist with image
 #return Filtered images based on image_name = image_name
+
+##Introduce element tokens as ground truth
+## simple split
+#1 conversation pair
+#1 description pair
+#1 simple tasks move, left click, right click
+
+##complex split
+#1 multi-step question-answer pair
+
+##bespoke split (learn how to crawl data like I want.)
+##TODO: stage 2, multi-site sequence of actions
+
 from datasets import load_dataset
 import json
 class DataProcess():
