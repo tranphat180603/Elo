@@ -1,6 +1,5 @@
 # Creating 8 lists corresponding to the categories
 from huggingface_hub import hf_hub_download, snapshot_download, login
-
 from OmniParser.utils import get_som_labeled_img, check_ocr_box, get_caption_model_processor, get_yolo_model
 
 login("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")
@@ -86,13 +85,35 @@ from transformers import AutoModel, AutoTokenizer
 import os
 import json
 
+class StreamingWriter:
+    def __init__(self, filename):
+        self.filename = filename
+        self.is_first = True
+        
+        # Initialize the JSON file with an opening bracket
+        with open(self.filename, 'w') as f:
+            f.write('\n')
+    
+    def write_entry(self, entry):
+        with open(self.filename, 'a') as f:
+            if not self.is_first:
+                f.write(',\n')
+            f.write(entry)
+            self.is_first = False
+    
+    def close(self):
+        with open(self.filename, 'a') as f:
+            f.write('\n')
+
+writer = StreamingWriter("minicpm-testing-rawimg.txt")
+
+
 model = AutoModel.from_pretrained('openbmb/MiniCPM-V-2_6', trust_remote_code=True,
     attn_implementation='flash_attention_2', torch_dtype=torch.bfloat16).to('cuda')
 model = model.eval().cuda()
 tokenizer = AutoTokenizer.from_pretrained('openbmb/MiniCPM-V-2_6', trust_remote_code=True)
 
 img_dir = "draft-data"
-responses = []
 i = 0
 img_files = []
 for img_file in os.listdir(img_dir):
@@ -115,9 +136,9 @@ for image_file in img_files:
                 tokenizer=tokenizer
             )
             response = f"{image_file}'\n'Generated Response: {res}"
-            responses.append(response)
+            writer.write_entry(question)
+            writer.write_entry(response)
             print(f"Question: {question}")
             print(response)
     print(f"DONE PLAYING WITH IMAGE {image_file}")
-with open("minicpm-testing-noboxes.txt", "w") as file:
-    file.write("\n".join(responses))
+writer.close()
