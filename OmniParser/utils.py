@@ -309,7 +309,7 @@ def predict_yolo(model, image_path, box_threshold, imgsz):
 def get_som_labeled_img(img_path, model=None, BOX_TRESHOLD = 0.01, output_coord_in_ratio=False, ocr_bbox=None, text_scale=0.4, text_padding=5, draw_bbox_config=None, caption_model_processor=None, ocr_text=[], use_local_semantics=True, iou_threshold=0.9,prompt=None,imgsz=640):
     """ ocr_bbox: list of xyxy format bbox
     """
-    TEXT_PROMPT = "clickable buttons on the screen"
+    TEXT_PROMPT = "clickable elements on the screen like: buttons, links, or images"
     # BOX_TRESHOLD = 0.02 # 0.05/0.02 for web and 0.1 for mobile
     TEXT_TRESHOLD = 0.01 # 0.9 # 0.01
     image_source = img_path.convert("RGB")

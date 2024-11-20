@@ -20,6 +20,7 @@ from datasets import Dataset, load_dataset
 from huggingface_hub import hf_hub_download, snapshot_download, login
 
 from OmniParser.utils import get_som_labeled_img, check_ocr_box, get_caption_model_processor, get_yolo_model
+from data_process import Processor
 
 login("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")
 
@@ -66,6 +67,7 @@ class PipelineConfig:
     caption_model_path: str = "OmniParser/weights/icon_caption_blip2"
     output_file: str = "data.json"
     logging_file: str = "box_prop.json"
+    processed_file: str = "processed_box_prop.json"
     start_index: int = 0
     end_index: int = None
 
@@ -91,11 +93,19 @@ def get_enhanced_meta_prompt(level: str, parsed_content_list: List[str]) -> str:
             "You must play both roles in this simulation and formulate meaningful conversations between these two entities.\n\n"
             "Context: The user is currently exploring the website's components, such as buttons, links, text boxes, dropdown menus, and other interactive elements. "
             "The agent's role is to provide accurate and informative answers grounded in the given bounding box properties.\n\n"
-            f"VERY IMPORTANT: Whenever referring to the description of each element, it must be nested inside the special tokens {elm_tok} and {elm_end_tok}.\n\n"
-            f"For example: 'The button for submitting the form is located here: {elm_tok}Text Box ID 5: Submit Button{elm_end_tok}.'\n\n"
-            "Based on this information, create a meaningful and grounding set of conversations between the user and the agent.\n"
+            f"VERY IMPORTANT: The response of the agent should strictly adhere to the following rule:\n"
+            f"- When referring to any element, it must use the exact Text Box ID provided (e.g., {elm_tok}Text Box ID 5{elm_end_tok}).\n"
+            f"- The content or value of the text box (e.g., 'MICHAELILEWIS') can be rephrased, corrected, or rewritten based on the agent's understanding of English and website design knowledge.\n\n"
+            f"For example: 'On the left of the website, there's a menu bar {elm_tok}Text Box ID 5{elm_end_tok} containing categories like shirts and jackets. "
+            f"On the right, there are advertisements {elm_tok}Text Box ID 1{elm_end_tok} promoting a marathon in Vietnam.'\n\n"
+            "Based on this information, create 2 meaningful and grounded conversations between the user and the agent. "
+            "Each conversation should involve one question from the user and one accurate response from the agent that references elements from the bounding boxes.\n\n"
             "Please respond ONLY in the following valid JSON format, without any additional commentary or formatting:\n"
             "[\n"
+            "  {\n"
+            '    "question": "User question here",\n'
+            '    "response": "Assistant response here"\n'
+            "  },\n"
             "  {\n"
             '    "question": "User question here",\n'
             '    "response": "Assistant response here"\n'
@@ -110,8 +120,8 @@ def get_enhanced_meta_prompt(level: str, parsed_content_list: List[str]) -> str:
             "At the same time, you are also a user exploring the website and asking for an overall description of it.\n\n"
             "Context: The user is currently looking at the website and trying to get an informative summary of it. "
             "The agent's role is to provide a detailed yet concise description of the website, mentioning important elements and their purposes after that.\n\n"
-            f"VERY IMPORTANT: Whenever referring to the description of a key element, it must be nested inside the special tokens {elm_tok} and {elm_end_tok}.\n\n"
-            f"For example: 'The main navigation bar includes options for browsing, such as {elm_tok}Text Box ID 0: Home{elm_end_tok} and {elm_tok}Text Box ID 1: About Us{elm_end_tok}.'\n\n"
+            f"VERY IMPORTANT: The response of the agent should follow the rule: Whenever referring to the description of each element, it must be nested inside the special tokens {elm_tok} and {elm_end_tok}.\n\n"
+            f"For example: 'The main navigation bar includes options for browsing, such as a search bar {elm_tok}Text Box ID 0{elm_end_tok} and a magnifying glass which is likely a search button {elm_tok}Text Box ID 1{elm_end_tok}.'\n\n"
             "The description should capture all significant information about the website's purpose, functionality, and key elements, written in an engaging and natural way.\n\n"
             "Respond ONLY in the following valid JSON array format, without additional commentary:\n"
             "[\n"
@@ -125,12 +135,28 @@ def get_enhanced_meta_prompt(level: str, parsed_content_list: List[str]) -> str:
     "simple_tasks": (
         context_description +
         "Imagine you are a helpful agent operating automatically on the website. Your task is to simulate single, one-step actions that a user might perform on the website.\n\n"
-        "Context: The user is interacting with the website and intends to perform a single, simple action. Actions can include moving the mouse and clicking, clicking and typing, or selecting an item from a dropdown menu. "
-        "The action must focus on one step only and should be grounded in the elements provided in the bounding boxes.\n\n"
-        f"VERY IMPORTANT: When referring to any element during the action, it must be nested inside the special tokens {elm_tok} and {elm_end_tok}.\n\n"
-        f"For example: 'Click on the search bar to start typing: {elm_tok}Text Box ID 4: Search Bar{elm_end_tok}.'\n\n"
+        "Context: The user is exploring the website and asking the agent to interact with different elements. "
+        "These elements may be interactable (e.g., buttons, text fields) or non-interactable (e.g., icons, static text). "
+        "The agent must accurately determine if an action is possible and respond accordingly. If the element is interactable, the agent should provide a detailed action plan. "
+        "If it is not interactable, the agent must explain why and, if appropriate, suggest an alternative action.\n\n"
+        f"VERY IMPORTANT: The response of the agent should follow these rules:\n"
+        f"1. When referring to elements, use the exact Text Box ID provided (e.g., {elm_tok}Text Box ID 10{elm_end_tok}).\n"
+        f"2. The description of each element can be rephrased or improved based on the agent's understanding of English and general website knowledge.\n\n"
+        f"Examples:\n"
+        f"1. If possible:\n"
+        f"User: Can you click on the image on the post of my friend Quan Nguyen?\n"
+        f"Assistant: Sure, let's navigate the mouse to the middle of the image {elm_tok}Text Box ID 10{elm_end_tok} and left-click on it with the mouse.\n\n"
+        f"2. If not possible:\n"
+        f"User: I want to know more about the person Quan Nguyen mentions in his post. Can you click on the name of that person to open his Facebook profile?\n"
+        f"Assistant: It seems like Quan Nguyen didn't directly tag Viet Hoang on the post. Maybe let's try searching Viet Hoang on Facebook search bar?\n\n"
+        "Your task is to create 2 meaningful and diverse conversations where the user asks the agent to perform simple tasks. "
+        "The agent must provide grounded and accurate responses based on the bounding boxes while generating diverse types of interactions.\n\n"
         "Please respond ONLY in the following valid JSON format, without any additional commentary or formatting:\n"
         "[\n"
+        "  {\n"
+        '    "question": "User question here",\n'
+        '    "response": "Assistant response here"\n'
+        "  },\n"
         "  {\n"
         '    "question": "User question here",\n'
         '    "response": "Assistant response here"\n'
@@ -138,7 +164,6 @@ def get_enhanced_meta_prompt(level: str, parsed_content_list: List[str]) -> str:
         "]\n\n"
         "Ensure that there is no text outside of the JSON structure, as this will be parsed directly. Follow these instructions strictly to avoid parsing errors.\n\n"
     ),
-
     "complex_tasks": (
         context_description +
         "Imagine you are a helpful agent operating automatically on the website and know everything about it. "
@@ -148,7 +173,7 @@ def get_enhanced_meta_prompt(level: str, parsed_content_list: List[str]) -> str:
         "The actions must be grounded directly in the current UI of the web and must only use elements present in the bounding boxes. "
         "The agent must analyze the task and plan the required steps step-by-step, ensuring the plan is possible and utilizes only the available elements in the bounding boxes.\n\n"
         f"VERY IMPORTANT: Whenever referring to any element, it must be nested inside the special tokens {elm_tok} and {elm_end_tok}.\n\n"
-        f"For example: 'Click the search bar and type a query: {elm_tok}Text Box ID 4: Search Bar{elm_end_tok}.'\n\n"
+        f"For example: 'Click the search bar and type a query: {elm_tok}Text Box ID 4{elm_end_tok}.'\n\n"
         "Instructions:\n"
         "- Break down the task into multiple steps (4–5).\n"
         "- Reference bounding box descriptions for all elements, using the special tokens.\n"
@@ -156,8 +181,8 @@ def get_enhanced_meta_prompt(level: str, parsed_content_list: List[str]) -> str:
         "Please respond ONLY in the following valid JSON array format, without any additional commentary or formatting:\n"
         "[\n"
         "  {\n"
-        '    "question": "User question here",\n'
-        f'    "Instruction": "Step 1: Do this {elm_tok}Text Box ID 0: Element Description{elm_end_tok}. Step 2: Then do this {elm_tok}Text Box ID 1: Element Description{elm_end_tok}.",\n'
+        '    "question": "User question here. For example: I want to find Steve Jobs iconic shirt to buy it, can you help me?",\n'
+        f'    "Instruction": "For example: Step 1: Move the mouse to the search bar {elm_tok}Text Box ID 0{elm_end_tok}. Step 2: Click and type "Turtlekneck sweatshirt like Steve Jobs" from your keyboard. Step 3: To perform search, click on the magnifying glass {elm_tok}Text Box ID 1{elm_end_tok}.",\n'
         '    "Next action": "What should be done first based on the planned steps?"\n'
         "  }\n"
         "]\n\n"
@@ -187,7 +212,7 @@ class ImageProcessor:
             image,
             display_img=False,
             output_bb_format='xyxy',
-            easyocr_args={'paragraph': False, 'text_threshold': 0.9},
+            easyocr_args={'paragraph': False, 'text_threshold': 0.6},
             use_paddleocr=True
         )
 
@@ -202,7 +227,7 @@ class ImageProcessor:
         labeled_img, coords, content_list = get_som_labeled_img(
             image,
             self.som_model,
-            BOX_TRESHOLD=0.03,
+            BOX_TRESHOLD=0.05,
             output_coord_in_ratio=False,
             ocr_bbox=ocr_bbox,
             draw_bbox_config=draw_bbox_config,
@@ -231,6 +256,7 @@ class SyntheticDataGenerator:
         self.box_writer = StreamingJSONWriter(self.config.logging_file)
         self.conversation_writer = StreamingJSONWriter(self.config.output_file)
 
+        self.data_processor = Processor(processed_file_path=config.processed_file)
     def _initialize_vlm_model(self):
         model = MllamaForConditionalGeneration.from_pretrained(
             self.config.vlm_model_name,
@@ -283,7 +309,7 @@ class SyntheticDataGenerator:
 
                     # Write to logging file only if the image is successfully saved
                     self.box_writer.write_entry(box_data)
-                    return image_path, bounding_boxes
+                    return image_path, bounding_boxes, coordinates
 
                 except Exception as save_error:
                     print(f"Failed to save image {image_name}: {str(save_error)}")
@@ -474,6 +500,7 @@ def main():
     parser.add_argument("--caption_model_path", type=str, default="OmniParser/weights/icon_caption_blip2")
     parser.add_argument("--output_file", type=str, default="data.json")
     parser.add_argument("--logging_file", type=str, default="box_prop.json")
+    parser.add_argument("--processed_file", type=str, default="processed_box_prop.json")   
     parser.add_argument("--start_index", type=int, default=0)
     parser.add_argument("--end_index", type=int, default=None)
     parser.add_argument("--batch_size", type=int, default=20)
@@ -504,16 +531,16 @@ def main():
                 for sample in batch:
                     try:
                         # Process image and write box data
-                        image_path, content_list = generator.process_and_write_sample(sample)
+                        image_path, content_list, _ = generator.process_and_write_sample(sample)
 
-                        print(f"Having saved: {len(os.listdir("processed_images"))}/{total_samples} images so far. ")
+                        print(f"Having saved: {len(os.listdir("processed_images"))}/{total_samples} images so far.")
                         with open(config.logging_file, "r") as file:
                             data = json.load(file)
                         num_box_prop = len(data)
-
                         print(f"Having saved: {num_box_prop}/{total_samples} samples in logging file so far. ")
+                        _, box_prop = generator.data_processor.process(image_path, content_list)
                         # Generate and write conversation data
-                        generator.generate_conversation_data(image_path, content_list)
+                        generator.generate_conversation_data(image_path, box_prop)
                         pbar.update(1)
                         
                     except Exception as e:
