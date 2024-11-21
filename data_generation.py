@@ -28,9 +28,6 @@ login("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")
 elm_tok = "<element>"
 elm_end_tok = "</element>"
 
-elms_tok = "<elements>"
-elms_end_tok = "<elements>"
-
 def load_and_save_model():    
     download_patterns = ["*.json", "*.bin", "*.safetensors", "*.yaml"]
     #Load the subdirectories of Omni Parser into weights
@@ -82,6 +79,8 @@ class PipelineConfig:
     end_index: int = None
 
 def get_enhanced_meta_prompt(level: str, parsed_content_list: List[str]) -> str:
+
+    parsed_content_list = wrap_ids_with_tokens(parsed_content_list) #add <elm> and </elm> tokens
 
     context_description = (
         f"You are given a website screenshot with interactable elements that have been bounded by boxes to increase precision. "
@@ -334,7 +333,7 @@ class SyntheticDataGenerator:
     def generate_conversation_data(self, image_path: str, content_list: List[str]):
         """Generate and write conversation data for all levels"""
         try:
-            levels = ["conversation", "description", "simple_tasks" ,"complex_tasks"]
+            levels = ["conversation", "description", "simple_tasks"]
             formatted_data = {
                 "id": "image_00", #required by minicpm 
                 "image": {
@@ -408,7 +407,7 @@ class SyntheticDataGenerator:
             # Generate response
             output = self.vlm_model.generate(
                 **inputs,
-                max_new_tokens=1024,
+                max_new_tokens=4096,
                 temperature=0.7,
                 top_p=0.9
             )
@@ -425,29 +424,31 @@ class SyntheticDataGenerator:
                     conversation["response"] = wrap_ids_with_tokens(conversation["response"])
                 formatted_conversation = []
                 if level == "conversation" or level == "description" or level == "simple_tasks":
-                    formatted_conversation.append({
-                        "role": f"user \n {image_tag}",
-                        "content": item["question"]
-                    })
-                    formatted_conversation.append({
-                        "role": "assistant",
-                        "content": f"{context_description} {item['response']}"
-                    })
+                    for item in response_data:
+                        formatted_conversation.append({
+                            "role": "user",
+                            "content": f"{image_tag}\n{context_description}\n{item['question']}"
+                        })
+                        formatted_conversation.append({
+                            "role": "assistant",
+                            "content": f"{item['response']}"
+                        })
 
                 elif level == "complex_tasks":
                     instruction_prefix = random.choice(instruction_prefixes)
                     next_action_prefix = random.choice(next_action_prefixes)
                     for item in response_data:
                         formatted_conversation.append({
-                            "role": f"user \n {image_tag}",
-                            "content": item["question"]
+                            "role": "user",
+                            "content": f"{image_tag}\n{context_description}\n{item['question']}"
                         })
                         formatted_conversation.append({
                             "role": "assistant",
-                            "content": f"{context_description} {instruction_prefix} {item['Instruction']}\n{next_action_prefix} {item['Next action']}"
+                            "content": f"{instruction_prefix} {item['Instruction']}\n{next_action_prefix} {item['Next action']}"
                         })
                 else:
                     formatted_conversation = []
+
                 return formatted_conversation
 
             except json.JSONDecodeError:
@@ -507,7 +508,7 @@ class StreamingJSONWriter:
 def main():
     # Parse arguments and create config
     parser = argparse.ArgumentParser(description="Synthetic Data Generation Pipeline")
-    parser.add_argument("--vlm_model_name", type=str, default="meta-llama/Llama-3.2-90B-Vision-Instruct")
+    parser.add_argument("--vlm_model_name", type=str, default="meta-llama/Llama-3.2-11B-Vision-Instruct")
     parser.add_argument("--yolo_model_path", type=str, default="OmniParser/weights/icon_detect/best.pt")
     parser.add_argument("--caption_model_name", type=str, default="blip2")
     parser.add_argument("--caption_model_path", type=str, default="OmniParser/weights/icon_caption_blip2")

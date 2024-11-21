@@ -19,6 +19,7 @@ import json
 from typing import List, Dict, Any, Tuple
 from PIL import Image
 import requests
+import numpy as np
 
 import torch
 from torchvision import io
@@ -87,7 +88,7 @@ class Processor():
             # Convert response to list of strings
             try:
                 response_list = eval(response) 
-                if isinstance(response_list, list, ndarray) and len(response_list) == len(box_prop):
+                if isinstance(response_list, (list, ndarray)) and len(response_list) == len(box_prop):
                     return response_list
             except Exception as e:
                 print(f"Error parsing response: {e}")
