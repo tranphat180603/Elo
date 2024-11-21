@@ -12,10 +12,12 @@ import json
 import random 
 import re
 from tqdm import tqdm
+import warnings
 
 import torch
 from safetensors.torch import load_file
 from ultralytics.nn.tasks import DetectionModel
+import transformers
 from transformers import AutoModel, AutoTokenizer, MllamaForConditionalGeneration, AutoProcessor
 from datasets import Dataset, load_dataset
 from huggingface_hub import hf_hub_download, snapshot_download, login
@@ -24,6 +26,8 @@ from OmniParser.utils import get_som_labeled_img, check_ocr_box, get_caption_mod
 from data_process import Processor
 
 login("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")
+transformers.logging.set_verbosity_error()
+warnings.filterwarnings('ignore')
 
 elm_tok = "<element>"
 elm_end_tok = "</element>"
@@ -77,6 +81,7 @@ class PipelineConfig:
     processed_file: str = "processed_box_prop.json"
     start_index: int = 0
     end_index: int = None
+    batch_size: int = 20
 
 def get_enhanced_meta_prompt(level: str, parsed_content_list: List[str]) -> str:
 
@@ -252,13 +257,13 @@ class SyntheticDataGenerator:
     def __init__(self, config: PipelineConfig):
         self.config = config
         print("Initializing VLM model...")
-        self.vlm_model, self.processor = self._initialize_vlm_model()
+        # self.vlm_model, self.processor = self._initialize_vlm_model()
         print("Initializing SOM model and image processor...")
         self.image_processor = ImageProcessor(
             self._initialize_som_model(),
             self._initialize_caption_processor()
         )
-        self.output_dir = "Elo/processed_images/train"
+        self.output_dir = "processed_images/train"
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
         
@@ -273,7 +278,7 @@ class SyntheticDataGenerator:
             device_map="auto",
         )
         processor = AutoProcessor.from_pretrained(self.config.vlm_model_name)
-        return model, processor
+        return model.tie_weights(), processor
     
     def _initialize_tokenizer(self) -> AutoTokenizer:
         return AutoTokenizer.from_pretrained(
@@ -293,7 +298,6 @@ class SyntheticDataGenerator:
     
     def process_and_write_sample(self, sample: Dict) -> Tuple[str, List[str]]:
         """Process a single sample and write box properties to logging file"""
-        image_dir = "Elo/proccesed_images"
         try:
             # Process image
             with torch.no_grad():
@@ -303,10 +307,11 @@ class SyntheticDataGenerator:
             image_name = f"processed_image_{sanitize_filename(sample['name'])}.png"
             image_path = os.path.join(self.output_dir, image_name)
 
+            image = Image.open(BytesIO(base64.b64decode(processed_image)))
             # Check if the processed image is valid and save it
-            if isinstance(processed_image, Image.Image):
+            if isinstance(image, Image.Image):
                 try:
-                    processed_image.save(image_path)
+                    # image.save(image_path)
                     print(f"Saved processed image: {image_name}")
 
                     # Create box list for logging
@@ -545,19 +550,21 @@ def main():
                 for sample in batch:
                     try:
                         # 1. Process image and write box prop
-                        image_path, content_list, _ = generator.process_and_write_sample(sample)
+                        image_path, content_list, coords = generator.process_and_write_sample(sample)
 
-                        print(f"Having saved: {len(os.listdir("processed_images"))}/{total_samples} images so far.")
+                        print(f"Having saved: {len(os.listdir('processed_images'))}/{total_samples} images so far.")
                         with open(config.logging_file, "r") as file:
-                            data = json.load(file)
-                        num_box_prop = len(data)
-                        print(f"Having saved: {num_box_prop}/{total_samples} samples in logging file so far. ")
+                            raw_content = file.read()
+                            raw_content += "\n".join("]")
+                            data = json.loads(raw_content)  # Explicitly parse raw content to identify exact errors
+
+                        print(f"Having saved: {len(data)}/{total_samples} samples in logging file so far. ")
 
                         # 2. Use another LLM to process because the box prop gotten from OCR modules are pretty bad
-                        _, box_prop = generator.data_processor.process(image_path, content_list)
+                        _, box_prop = generator.data_processor.process(image_path, content_list, coords)
 
                         # 3. Use the process box prop along with the corresponding image to generate and write conversation data
-                        generator.generate_conversation_data(image_path, box_prop)
+                        # generator.generate_conversation_data(image_path, box_prop)
                         pbar.update(1)
                         
                     except Exception as e:

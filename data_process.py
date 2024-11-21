@@ -26,8 +26,26 @@ from torchvision import io
 from datasets import load_dataset
 from transformers import MllamaForConditionalGeneration, AutoProcessor
 
-from data_generation import StreamingJSONWriter, convert_ndarray_to_list
-
+class StreamingJSONWriter:
+    def __init__(self, filename):
+        self.filename = filename
+        self.is_first = True
+        
+        # Initialize the JSON file with an opening bracket
+        with open(self.filename, 'w') as f:
+            f.write('[\n')
+    
+    def write_entry(self, entry):
+        with open(self.filename, 'a') as f:
+            if not self.is_first:
+                f.write(',\n')
+            json.dump(entry, f)
+            self.is_first = False
+    
+    def close(self):
+        with open(self.filename, 'a') as f:
+            f.write('\n]')
+        
 class Processor():
     def __init__(self, vlm_model: str = "meta-llama/Llama-3.2-11B-Vision-Instruct", 
                  processed_file_path: str = "/Elo/processed_box_prop.json") -> None:
@@ -67,7 +85,6 @@ class Processor():
             {str(box_prop)}
             """
 
-            image = Image.open(image)
             messages = [
                 {"role": "user", "content": [
                     {"type": "image"},
@@ -87,6 +104,7 @@ class Processor():
 
             # Convert response to list of strings
             try:
+                print(f"Response: {response}")
                 response_list = eval(response) 
                 if isinstance(response_list, (list, ndarray)) and len(response_list) == len(box_prop):
                     return response_list
