@@ -151,6 +151,7 @@ def get_enhanced_meta_prompt(level: str, parsed_content_list: List[str]) -> str:
             "If it is not interactable, the agent must explain why and, if appropriate, suggest an alternative action.\n\n"
             f"VERY IMPORTANT: The response of the agent should strictly adhere to the following rule:\n"
             f"- When referring to any element, it must use the exact Text Box ID provided (e.g., Text Box ID 5).\n"
+            f"- Any action must begin with the action of moving the mouse."
             "Examples:\n"
             "1. If possible:\n"
             "User: Can you click on the image on the post of my friend Quan Nguyen?\n"
@@ -476,7 +477,15 @@ class Dataset:
 
     def _apply_default_filter(self):
         # Apply filter to keep only web platform examples in English
-        return self.ds["train"].filter(lambda example: example["platform"] == "web" and example["language"] == "English")
+        return self.ds["train"].filter(lambda example: example["platform"] == "web" and example["language"] == "English" and example["source"] != "roboflow" and example['source'] != "webui")
+    
+    def _get_complex_set(self):
+        first_filter = self.filtered_ds.filter(lambda sample: sample['source'] == "omniact" and sample['resolution'] == [1280, 720])
+        second_filter = self.filtered_ds.filter(lambda example: example["source"] == "mind2web_test_task" or example["source"] == "screenspot" or example["source"] == "mind2web_test_website")
+        return first_filter + second_filter
+    
+    def _get_text_set(self):
+
 
     def select_data(self, start_index, end_index=None):
         if end_index:
@@ -585,3 +594,23 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+{ 
+    "dict_name": "control",
+    "use": [{
+        "mouse": {
+            "action_1": "move", #10
+            "action_2": "scroll", #3
+            "action_3": "left click", #10
+            "action_4": "right click", #5
+            "action_5": "hold", #12 #drag drop/copy text
+        },
+        "keyboard":{
+            "action_1": "type"
+        }
+    } ]
+}
+
+#move va click thi hau het website deu co the lam duoc
+copy: move -> click -> hold -> move (scan) -> right click -> left click

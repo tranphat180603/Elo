@@ -100,7 +100,8 @@ class Processor():
             ).to(self.vlm_model.device)
 
             output = self.vlm_model.generate(**inputs, max_new_tokens=4096)
-            response = self.model_processor.decode(output[0])
+            response = [output_id[len(input_id):] for output_id, input_id in zip(output, inputs)]
+            response = self.model_processor.decode(output[0], skip_special_tokens = True)
 
             # Convert response to list of strings
             try:
