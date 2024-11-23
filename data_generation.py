@@ -79,6 +79,7 @@ class PipelineConfig:
     output_file: str = "data.json"
     logging_file: str = "box_prop.json"
     processed_file: str = "processed_box_prop.json"
+    ds_split: str = "complex"
     start_index: int = 0
     end_index: int = None
     batch_size: int = 20
@@ -264,7 +265,7 @@ class SyntheticDataGenerator:
             self._initialize_som_model(),
             self._initialize_caption_processor()
         )
-        self.output_dir = "processed_images/train"
+        self.output_dir = f"processed_images/train/{config.ds_split}"
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
         
@@ -477,27 +478,33 @@ class Dataset:
 
     def _apply_default_filter(self):
         # Apply filter to keep only web platform examples in English
-        return self.ds["train"].filter(lambda example: example["platform"] == "web" and example["language"] == "English" and example["source"] != "roboflow" and example['source'] != "webui")
+        return self.ds["train"].filter(lambda example: example["platform"] == "web" and example["language"] == "English" and example["source"] != "motif" and example['source'] != "mind2web_test_domain")
+    
+    def _get_full_ds(self):
+        return self.filtered_ds
     
     def _get_complex_set(self):
-        first_filter = self.filtered_ds.filter(lambda sample: sample['source'] == "omniact" and sample['resolution'] == [1280, 720])
-        second_filter = self.filtered_ds.filter(lambda example: example["source"] == "mind2web_test_task" or example["source"] == "screenspot" or example["source"] == "mind2web_test_website")
-        return first_filter + second_filter
+        first_filter = list(set(self.filtered_ds.filter(lambda sample: sample['source'] == "mind2web_test_task" and sample['resolution'] == [1280, 720])))
+        second_filter = list(set(self.filtered_ds.filter(lambda example: example["source"] == "omniact" or example["source"] == "screenspot" or example["source"] == "mind2web_test_website")))
+        first_filter = first_filter.extend(second_filter) #concat both lists together
+        complex_set = Dataset.from_list(first_filter) #convert back to Dataset object
+        return complex_set
     
-    def _get_text_set(self):
+    def _get_simple_set(self):
+        s_simple_set = self.filtered_ds.filter(lambda sample: sample['source'] == "roboflow")
+        return s_simple_set
 
-
-    def select_data(self, start_index, end_index=None):
+    def select_data(self, dataset, start_index, end_index=None):
         if end_index:
-            return self.filtered_ds.select(range(start_index, end_index))
+            return dataset.select(range(start_index, end_index))
         else:
-            return self.filtered_ds.select(range(start_index, len(self.filtered_ds)))
+            return dataset.select(range(start_index, len(self.filtered_ds)))
 
-    def process_data_in_batches(self, start_index, end_index=None, batch_size=100):
-        total_size = len(self.filtered_ds)
+    def process_data_in_batches(self, dataset ,start_index, end_index=None, batch_size=100):
+        total_size = len(dataset)
         end_index = end_index if end_index else total_size
         for i in range(start_index, end_index, batch_size):
-            yield self.filtered_ds.select(range(i, min(i + batch_size, end_index)))
+            yield dataset.select(range(i, min(i + batch_size, end_index)))
 
 class StreamingJSONWriter:
     def __init__(self, filename):
@@ -529,6 +536,7 @@ def main():
     parser.add_argument("--output_file", type=str, default="data.json")
     parser.add_argument("--logging_file", type=str, default="box_prop.json")
     parser.add_argument("--processed_file", type=str, default="processed_box_prop.json")   
+    parser.add_argument("--ds_split", type=str, default="complex", help= "specify which set of dataset is processing. Either simple or complex")   
     parser.add_argument("--start_index", type=int, default=0)
     parser.add_argument("--end_index", type=int, default=None)
     parser.add_argument("--batch_size", type=int, default=20)
@@ -543,17 +551,33 @@ def main():
     dataset_instance = Dataset()
     generator = SyntheticDataGenerator(config)
     
+    dataset = None
     try:
         # Get full dataset
-        full_ds = dataset_instance.select_data(config.start_index, config.end_index)
-        total_samples = len(full_ds)
-        
+        if config.ds_split == "full":
+            full_ds = dataset_instance._get_full_ds()
+            full_ds = dataset_instance.select_data(full_ds,config.start_index, config.end_index)
+            dataset = full_ds
+            total_samples = len(dataset)
+            #choose 1 in 2 sets: complex and simple
+        elif config.ds_split == "complex":
+            complex_set = dataset_instance._get_complex_set()
+            complex_set = dataset_instance.select_data(complex_set,config.start_index, config.end_index)
+            dataset = complex_set
+            total_samples = len(dataset)
+        elif config.ds_split == "simple":
+            simple_set = dataset_instance._get_simple_set()
+            simple_set = dataset_instance.select_data(simple_set,config.start_index, config.end_index)
+            dataset = simple_set
+            total_samples = len(dataset)
+
         # Process in batches
         with tqdm(total=total_samples, desc="Processing samples") as pbar:
             for batch in dataset_instance.process_data_in_batches(
+                dataset,  #chon 1 trong 2 sets: complex/simple set
                 config.start_index, 
                 config.end_index, 
-                args.batch_size
+                config.batch_size
             ):
                 # Process each sample in batch
                 for sample in batch:
