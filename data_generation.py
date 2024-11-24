@@ -23,7 +23,7 @@ from datasets import Dataset, load_dataset
 from huggingface_hub import hf_hub_download, snapshot_download, login
 
 from OmniParser.utils import get_som_labeled_img, check_ocr_box, get_caption_model_processor, get_yolo_model
-from data_process import Processor
+from data_process import Processor as PropertyProcessor
 
 login("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")
 transformers.logging.set_verbosity_error()
@@ -255,7 +255,7 @@ class ImageProcessor:
         )
         return labeled_img, coords, content_list
     
-class SyntheticDataGenerator:
+class DataAlchemist:    
     def __init__(self, config: PipelineConfig):
         self.config = config
         print("Initializing VLM model...")
@@ -272,7 +272,7 @@ class SyntheticDataGenerator:
         self.box_writer = StreamingJSONWriter(self.config.logging_file)
         self.conversation_writer = StreamingJSONWriter(self.config.output_file)
 
-        self.data_processor = Processor(processed_file_path=config.processed_file)
+        self.data_processor = PropertyProcessor(processed_file_path=config.processed_file)
     def _initialize_vlm_model(self):
         model = MllamaForConditionalGeneration.from_pretrained(
             self.config.vlm_model_name,
@@ -340,7 +340,11 @@ class SyntheticDataGenerator:
     def generate_conversation_data(self, image_path: str, content_list: List[str]):
         """Generate and write conversation data for all levels"""
         try:
-            levels = ["conversation", "description", "simple_tasks"]
+            if self.config.ds_split == "simple":
+                levels = ["conversation", "description", "simple_tasks"]
+            elif self.config.ds_split == "complex":
+                levels = ["complex_tasks"]
+                
             formatted_data = {
                 "id": "image_00", #required by minicpm 
                 "image": {
@@ -549,25 +553,37 @@ def main():
     load_and_save_model()
     
     dataset_instance = Dataset()
-    generator = SyntheticDataGenerator(config)
+    generator = DataAlchemist(config)
     
     dataset = None
     try:
-        # Get full dataset
         if config.ds_split == "full":
+            config.processed_file = "full_processed_box_prop.json"
+            config.logging_file = "full_logging.json"
+            config.output_file = "full_data.json"
+
             full_ds = dataset_instance._get_full_ds()
-            full_ds = dataset_instance.select_data(full_ds,config.start_index, config.end_index)
+            full_ds = dataset_instance.select_data(full_ds, config.start_index, config.end_index)
             dataset = full_ds
             total_samples = len(dataset)
-            #choose 1 in 2 sets: complex and simple
+
         elif config.ds_split == "complex":
+            config.processed_file = "complex_processed_box_prop.json"
+            config.logging_file = "complex_logging.json"
+            config.output_file = "complex_data.json"
+
             complex_set = dataset_instance._get_complex_set()
-            complex_set = dataset_instance.select_data(complex_set,config.start_index, config.end_index)
+            complex_set = dataset_instance.select_data(complex_set, config.start_index, config.end_index)
             dataset = complex_set
             total_samples = len(dataset)
+
         elif config.ds_split == "simple":
+            config.processed_file = "simple_processed_box_prop.json"
+            config.logging_file = "simple_logging.json"
+            config.output_file = "simple_data.json"
+
             simple_set = dataset_instance._get_simple_set()
-            simple_set = dataset_instance.select_data(simple_set,config.start_index, config.end_index)
+            simple_set = dataset_instance.select_data(simple_set, config.start_index, config.end_index)
             dataset = simple_set
             total_samples = len(dataset)
 
